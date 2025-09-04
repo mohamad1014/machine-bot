@@ -61,9 +61,32 @@ import gradio as gr
 ```
 
 ## Deployment
-
+ 
 - Deploy backend services to Azure for scalability and security.
 - Host Gradio UI on Hugging Face Spaces for public access.
+
+## Azure Functions (Python v2)
+
+- Entry point: `function_app.py` creates a shared `app` and imports modules under `functions/`.
+- Samples included:
+  - `functions/http_conversation.py` – HTTP trigger
+  - `functions/timer_cleanup.py` – Timer trigger (5 minutes)
+  - `functions/queue_worker.py` – Storage Queue trigger (`tasks`)
+  - `functions/cosmos_listener.py` – Cosmos DB change feed trigger
+
+### Local run
+
+1) Install dependencies: `pip install -r requirements.txt`
+2) Start the Functions host: `func start`
+
+Configure local settings in `local.settings.json` (no secrets committed). Required keys:
+- `AzureWebJobsStorage` (for local emulator or real storage)
+- `CosmosDbConnection`, `CosmosDatabase`, `CosmosContainer` (for Cosmos trigger)
+- `SqlConnectionString` (if using SQL access/bindings)
+
+### IaC (Bicep)
+
+Infrastructure templates are in `infra/`. See `infra/README.md` for parameters and deployment steps using `az deployment group create`.
 
 ## License
 

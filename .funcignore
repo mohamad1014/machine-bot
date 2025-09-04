@@ -1,0 +1,6 @@
+.git/
+.vscode/
+infra/
+README.md
+uv.lock
+pyproject.toml

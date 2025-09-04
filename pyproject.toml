@@ -6,4 +6,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "langchain>=0.3.27",
+    "azure-functions>=1.20.0",
+    "azure-identity>=1.18.0",
+    "azure-cosmos>=4.7.0",
+    "sqlalchemy>=2.0.0",
 ]
