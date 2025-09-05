@@ -9,5 +9,6 @@ dependencies = [
     "azure-functions>=1.20.0",
     "azure-identity>=1.18.0",
     "azure-cosmos>=4.7.0",
+    "azure-storage-blob>=12.20.0",
     "sqlalchemy>=2.0.0",
 ]
