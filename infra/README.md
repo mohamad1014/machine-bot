@@ -22,7 +22,7 @@ Deploy
    az deployment group create \
      -g rg-machine-bot \
      -f infra/main.bicep \
-     -p namePrefix=mbot location=westeurope cosmosDbName=db cosmosContainerName=items sqlAdminLogin=sqladmin sqlAdminPassword=YOUR_STRONG_PASSWORD
+     -p namePrefix=mbot location=westeurope cosmosDbName=mbotdb cosmosContainerName=mbotitems sqlAdminLogin=sqladmin sqlAdminPassword=YOUR_STRONG_PASSWORD
 
 Outputs include connection values you can set as application settings locally (or wire via Key Vault).
 
