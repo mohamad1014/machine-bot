@@ -13,6 +13,15 @@ param sqlAdminPassword string
 @description('SQL admin login name')
 param sqlAdminLogin string
 
+@description('Azure OpenAI endpoint')
+param azureOpenAIEndpoint string
+@secure()
+@description('Azure OpenAI API key')
+param azureOpenAIKey string
+@description('Azure OpenAI API version')
+param azureOpenAIApiVersion string
+@description('Azure OpenAI chat deployment name')
+param azureOpenAIChatDeployment string
 var storageAccountName = toLower('${namePrefix}stor${uniqueString(resourceGroup().id)}')
 var functionAppName = toLower('${namePrefix}-func-${uniqueString(resourceGroup().id)}')
 var appInsightsName = toLower('${namePrefix}-appi')
@@ -126,6 +135,22 @@ resource func 'Microsoft.Web/sites@2022-09-01' = {
         {
           name: 'SqlConnectionString'
           value: sql.outputs.connectionString
+        }
+        {
+          name: 'AZURE_OPENAI_ENDPOINT'
+          value: azureOpenAIEndpoint
+        }
+        {
+          name: 'AZURE_OPENAI_API_KEY'
+          value: azureOpenAIKey
+        }
+        {
+          name: 'AZURE_OPENAI_API_VERSION'
+          value: azureOpenAIApiVersion
+        }
+        {
+          name: 'AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'
+          value: azureOpenAIChatDeployment
         }
       ]
     }

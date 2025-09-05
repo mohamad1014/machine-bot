@@ -13,6 +13,10 @@ Parameters (main.bicep)
 - `cosmosDbName`: Cosmos DB database name
 - `cosmosContainerName`: Cosmos DB container name
 - `sqlAdminLogin` / `sqlAdminPassword`: SQL admin credentials
+- `azureOpenAIEndpoint`: Azure OpenAI endpoint
+- `azureOpenAIKey`: Azure OpenAI API key
+- `azureOpenAIApiVersion`: Azure OpenAI API version
+- `azureOpenAIChatDeployment`: Azure OpenAI chat deployment name
 
 Deploy
 1) Create resource group (if needed):
