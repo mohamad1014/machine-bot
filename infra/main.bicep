@@ -13,15 +13,20 @@ param sqlAdminPassword string
 @description('SQL admin login name')
 param sqlAdminLogin string
 
-@description('Azure OpenAI endpoint')
-param azureOpenAIEndpoint string
+@secure()
+@description('Connection string for manuals markdown storage')
+param manualsMdConnectionString string
+
+@description('Azure OpenAI endpoint URL')
+param azureOpenAiEndpoint string
+
 @secure()
 @description('Azure OpenAI API key')
-param azureOpenAIKey string
-@description('Azure OpenAI API version')
-param azureOpenAIApiVersion string
-@description('Azure OpenAI chat deployment name')
-param azureOpenAIChatDeployment string
+param azureOpenAiApiKey string
+
+@description('Azure OpenAI deployment name')
+param azureOpenAiDeployment string
+
 var storageAccountName = toLower('${namePrefix}stor${uniqueString(resourceGroup().id)}')
 var functionAppName = toLower('${namePrefix}-func-${uniqueString(resourceGroup().id)}')
 var appInsightsName = toLower('${namePrefix}-appi')
@@ -137,20 +142,20 @@ resource func 'Microsoft.Web/sites@2022-09-01' = {
           value: sql.outputs.connectionString
         }
         {
+          name: 'MANUALS_MD_CONNECTION_STRING'
+          value: manualsMdConnectionString
+        }
+        {
           name: 'AZURE_OPENAI_ENDPOINT'
-          value: azureOpenAIEndpoint
+          value: azureOpenAiEndpoint
         }
         {
           name: 'AZURE_OPENAI_API_KEY'
-          value: azureOpenAIKey
+          value: azureOpenAiApiKey
         }
         {
-          name: 'AZURE_OPENAI_API_VERSION'
-          value: azureOpenAIApiVersion
-        }
-        {
-          name: 'AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'
-          value: azureOpenAIChatDeployment
+          name: 'AZURE_OPENAI_DEPLOYMENT'
+          value: azureOpenAiDeployment
         }
       ]
     }
@@ -164,4 +169,9 @@ output cosmosPrimaryKey string = cosmos.outputs.primaryKey
 output cosmosConnectionString string = cosmos.outputs.connectionString
 output sqlServerFqdn string = sql.outputs.fqdn
 output sqlConnectionString string = sql.outputs.connectionString
+output manualsMdConnectionString string = manualsMdConnectionString
+output azureOpenAiEndpoint string = azureOpenAiEndpoint
+output azureOpenAiApiKey string = azureOpenAiApiKey
+output azureOpenAiDeployment string = azureOpenAiDeployment
+output conversationRunUrl string = 'https://${functionAppName}.azurewebsites.net/api/conversationRun'
 

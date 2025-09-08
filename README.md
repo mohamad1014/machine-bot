@@ -74,6 +74,80 @@ import gradio as gr
   - `functions/queue_worker.py` – Storage Queue trigger (`tasks`)
   - `functions/cosmos_listener.py` – Cosmos DB change feed trigger
 
+### `POST /api/conversationRun`
+
+Invoke the conversational model via an HTTP POST. The endpoint accepts either
+pure text messages or mixed text+image content and returns the model's
+response.
+
+**Required environment variables**
+
+- `AZURE_OPENAI_ENDPOINT` – endpoint URL for your Azure OpenAI deployment
+- `AZURE_OPENAI_API_KEY` – API key for the Azure OpenAI resource
+- `AzureWebJobsStorage` – Azure Storage connection string used by the function
+
+#### Text request
+
+```http
+POST /api/conversationRun
+Content-Type: application/json
+
+{
+  "messages": [
+    {"role": "user", "content": "What is the status of machine 42?"}
+  ]
+}
+```
+
+Example response:
+
+```json
+{
+  "choices": [
+    {
+      "message": {
+        "role": "assistant",
+        "content": "Machine 42 is idle."
+      }
+    }
+  ]
+}
+```
+
+#### Image request
+
+```http
+POST /api/conversationRun
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "Inspect this component"},
+        {"type": "image_url", "image_url": {"url": "https://example.com/photo.jpg"}}
+      ]
+    }
+  ]
+}
+```
+
+Example response:
+
+```json
+{
+  "choices": [
+    {
+      "message": {
+        "role": "assistant",
+        "content": "The component shows signs of wear on the belt."
+      }
+    }
+  ]
+}
+```
+
 ### Local run
 
 1) Install dependencies: `pip install -r requirements.txt`

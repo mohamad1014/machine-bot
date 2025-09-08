@@ -13,10 +13,10 @@ Parameters (main.bicep)
 - `cosmosDbName`: Cosmos DB database name
 - `cosmosContainerName`: Cosmos DB container name
 - `sqlAdminLogin` / `sqlAdminPassword`: SQL admin credentials
-- `azureOpenAIEndpoint`: Azure OpenAI endpoint
-- `azureOpenAIKey`: Azure OpenAI API key
-- `azureOpenAIApiVersion`: Azure OpenAI API version
-- `azureOpenAIChatDeployment`: Azure OpenAI chat deployment name
+- `manualsMdConnectionString`: Connection string for manuals markdown storage (blob container)
+- `azureOpenAiEndpoint`: Azure OpenAI endpoint URL
+- `azureOpenAiApiKey`: Azure OpenAI API key
+- `azureOpenAiDeployment`: Azure OpenAI deployment name
 
 Deploy
 1) Create resource group (if needed):
@@ -26,7 +26,13 @@ Deploy
    az deployment group create \
      -g rg-machine-bot \
      -f infra/main.bicep \
-     -p namePrefix=mbot location=westeurope cosmosDbName=db cosmosContainerName=items sqlAdminLogin=sqladmin sqlAdminPassword=YOUR_STRONG_PASSWORD
+     -p namePrefix=mbot location=westeurope cosmosDbName=mbotdb cosmosContainerName=mbotitems \
+        sqlAdminLogin=sqladmin sqlAdminPassword=YOUR_STRONG_PASSWORD \
+        manualsMdConnectionString=YOUR_STORAGE_CONNECTION \
+        azureOpenAiEndpoint=YOUR_OPENAI_ENDPOINT \
+        azureOpenAiApiKey=YOUR_OPENAI_KEY \
+        azureOpenAiDeployment=YOUR_OPENAI_DEPLOYMENT
 
-Outputs include connection values you can set as application settings locally (or wire via Key Vault).
+Outputs include connection values and URLs you can set as application settings locally (or wire via Key Vault). The `conversationRunUrl`
+output gives the HTTP endpoint for the sample function (requires a function key).
 
