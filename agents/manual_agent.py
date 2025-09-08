@@ -71,4 +71,4 @@ def create_manual_agent(
     )
 
     agent = create_tool_calling_agent(llm, [tool], prompt)
-    return AgentExecutor(agent=agent, tools=[tool], verbose=False)
+    return AgentExecutor(agent=agent, tools=[tool], verbose=True)
