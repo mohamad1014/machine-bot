@@ -13,6 +13,20 @@ param sqlAdminPassword string
 @description('SQL admin login name')
 param sqlAdminLogin string
 
+@secure()
+@description('Connection string for manuals markdown storage')
+param manualsMdConnectionString string
+
+@description('Azure OpenAI endpoint URL')
+param azureOpenAiEndpoint string
+
+@secure()
+@description('Azure OpenAI API key')
+param azureOpenAiApiKey string
+
+@description('Azure OpenAI deployment name')
+param azureOpenAiDeployment string
+
 var storageAccountName = toLower('${namePrefix}stor${uniqueString(resourceGroup().id)}')
 var functionAppName = toLower('${namePrefix}-func-${uniqueString(resourceGroup().id)}')
 var appInsightsName = toLower('${namePrefix}-appi')
@@ -127,6 +141,22 @@ resource func 'Microsoft.Web/sites@2022-09-01' = {
           name: 'SqlConnectionString'
           value: sql.outputs.connectionString
         }
+        {
+          name: 'MANUALS_MD_CONNECTION_STRING'
+          value: manualsMdConnectionString
+        }
+        {
+          name: 'AZURE_OPENAI_ENDPOINT'
+          value: azureOpenAiEndpoint
+        }
+        {
+          name: 'AZURE_OPENAI_API_KEY'
+          value: azureOpenAiApiKey
+        }
+        {
+          name: 'AZURE_OPENAI_DEPLOYMENT'
+          value: azureOpenAiDeployment
+        }
       ]
     }
   }
@@ -139,4 +169,9 @@ output cosmosPrimaryKey string = cosmos.outputs.primaryKey
 output cosmosConnectionString string = cosmos.outputs.connectionString
 output sqlServerFqdn string = sql.outputs.fqdn
 output sqlConnectionString string = sql.outputs.connectionString
+output manualsMdConnectionString string = manualsMdConnectionString
+output azureOpenAiEndpoint string = azureOpenAiEndpoint
+output azureOpenAiApiKey string = azureOpenAiApiKey
+output azureOpenAiDeployment string = azureOpenAiDeployment
+output conversationRunUrl string = 'https://${functionAppName}.azurewebsites.net/api/conversationRun'
 
