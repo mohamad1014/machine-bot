@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "langchain>=0.3.27",
+    "langchain-openai>=0.2.0",
     "azure-functions>=1.20.0",
     "azure-identity>=1.18.0",
     "azure-cosmos>=4.7.0",
