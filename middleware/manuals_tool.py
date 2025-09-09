@@ -98,15 +98,50 @@ class ManualMarkdownTool(BaseTool):
             except Exception:  # pragma: no cover - handled gracefully
                 self._container_client = None
 
+    def run(self, *args, **kwargs):
+        """Flexible run wrapper to support different call signatures.
+
+        Accepts:
+        - run(machine_name='...')
+        - run(tool_input={'machine_name': '...'})
+        - run('machine_name')
+        - run(tool_input=SomePydanticModel(...))
+        """
+        machine_name = None
+        # explicit kwarg
+        if "machine_name" in kwargs:
+            machine_name = kwargs.get("machine_name")
+        # langchain style
+        elif "tool_input" in kwargs:
+            ti = kwargs.get("tool_input")
+            if isinstance(ti, dict):
+                machine_name = ti.get("machine_name")
+            else:
+                machine_name = getattr(ti, "machine_name", None)
+        # single positional argument
+        elif len(args) == 1:
+            arg = args[0]
+            if isinstance(arg, str):
+                machine_name = arg
+            elif isinstance(arg, dict):
+                machine_name = arg.get("machine_name")
+            else:
+                machine_name = getattr(arg, "machine_name", None)
+
+        if not machine_name:
+            raise TypeError("Missing required argument 'machine_name'")
+
+        return self._run(machine_name=machine_name)
+
     # pylint: disable=unused-argument
     def _run(self, machine_name: str) -> str:  # type: ignore[override]
         blob_name = f"{machine_name}.md"
         if self._container_client is not None:
             try:
                 blob_client = self._container_client.get_blob_client(blob_name)
-                manual_text = blob_client.download_blob().content_as_text(
-                    encoding="utf-8"
-                )
+                # Use readall() and decode to avoid deprecated content_as_text API
+                blob_data = blob_client.download_blob().readall()
+                manual_text = blob_data.decode("utf-8")
                 return f"{manual_text}"
             except Exception:
                 # If any issue occurs during blob retrieval fall back to local path.
