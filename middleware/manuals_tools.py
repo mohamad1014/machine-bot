@@ -48,7 +48,9 @@ except Exception:  # pragma: no cover
 
     def Field(default, description=""):
         return default
-
+    
+    def PrivateAttr(default=None):
+        return default
 
 class ManualToolInput(BaseModel):
     """Input schema for :class:`ManualsTool`."""
@@ -120,21 +122,24 @@ class ManualsTool(BaseTool):
     # pylint: disable=unused-argument
     def _run(self, machine_name: str) -> str:  # type: ignore[override]
         blob_name = f"{machine_name}.md"
-        if (
-            self.connection_string
-            and AzureBlobStorageContainerLoader is not None
-        ):
+        
+        # Try Azure Blob Storage directly (without langchain loaders to avoid unstructured dependency)
+        if self.connection_string and BlobServiceClient is not None:
             try:
-                loader = AzureBlobStorageContainerLoader(
-                    conn_str=self.connection_string,
-                    container=self.container_name,
-                    prefix=blob_name,
+                service_client = BlobServiceClient.from_connection_string(
+                    self.connection_string
                 )
-                docs = loader.load()
-                if docs:
-                    return docs[0].page_content
+                container_client = service_client.get_container_client(
+                    self.container_name
+                )
+                blob_client = container_client.get_blob_client(blob_name)
+                if blob_client.exists():
+                    blob_data = blob_client.download_blob()
+                    return blob_data.readall().decode("utf-8")
             except Exception:
                 pass
+        
+        # Fallback to local file
         manual_file = self.fallback_path / blob_name
         if manual_file.exists():
             return manual_file.read_text(encoding="utf-8")
@@ -170,6 +175,10 @@ class FetchManualsTool(BaseTool):
             else os.environ.get("MANUALS_MD_PATH", "manuals-md"),
         )
 
+    def run(self, *args, **kwargs):
+        """Flexible run wrapper for FetchManualsTool (no arguments needed)."""
+        return self._run()
+
     # pylint: disable=unused-argument
     def _run(self) -> str:  # type: ignore[override]
         names: list[str] = []
@@ -182,16 +191,6 @@ class FetchManualsTool(BaseTool):
                     self.container_name,
                 )
                 for blob in container_client.list_blobs():
-                    if AzureBlobStorageFileLoader is not None:
-                        loader = AzureBlobStorageFileLoader(
-                            conn_str=self.connection_string,
-                            container=self.container_name,
-                            blob_name=blob.name,
-                        )
-                        try:
-                            loader.load()
-                        except Exception:
-                            continue
                     names.append(blob.name)
             except Exception:
                 names = []

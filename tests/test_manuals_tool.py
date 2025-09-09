@@ -7,7 +7,7 @@ import os
 import unittest
 from pathlib import Path
 
-from middleware.manuals_tools import ManualsTool
+from middleware.manuals_tools import ManualsTool, FetchManualsTool
 
 def test_print_env_vars():
     """Debug visibility of env vars used by tests."""
@@ -194,3 +194,51 @@ class TestManualsToolIntegration(unittest.TestCase):
 
         # Compare fetched blob text to local file text
         self.assertEqual(result, expected_text)
+
+    def test_fetch_manuals_tool_lists_expected_files(self) -> None:
+        """Test that FetchManualsTool returns the expected manual files."""
+        
+        conn_str = _load_connection_string()
+        if not conn_str:
+            self.fail("No connection string found in env or local.settings.json")
+        
+        container_name = os.environ.get("MANUALS_MD_CONTAINER", "manuals-md")
+        
+        # Load expected manual names from the test data file
+        expected_manuals_path = Path(__file__).parent / "data" / "machine_manual_list.txt"
+        if not expected_manuals_path.exists():
+            self.fail(f"Missing expected manuals file: {expected_manuals_path}")
+        
+        expected_text = expected_manuals_path.read_text(encoding="utf-8").strip()
+        try:
+            expected_manuals = json.loads(expected_text)
+        except json.JSONDecodeError as exc:
+            self.fail(f"Invalid JSON in {expected_manuals_path}: {exc}")
+        
+        if not isinstance(expected_manuals, list):
+            self.fail(f"Expected list in {expected_manuals_path}, got {type(expected_manuals)}")
+        
+        # Use FetchManualsTool to get the list of available manuals
+        tool = FetchManualsTool(
+            connection_string=conn_str,
+            container_name=container_name,
+            fallback_path="/__does_not_exist__",
+        )
+        
+        result = tool._run()
+        available_manuals = result.strip().split('\n') if result.strip() else []
+        
+        # Check that all expected manuals are present in the container
+        for expected_manual in expected_manuals:
+            self.assertIn(
+                expected_manual, 
+                available_manuals,
+                f"Expected manual '{expected_manual}' not found in container. Available: {available_manuals}"
+            )
+        
+        # Verify we got a non-empty list
+        self.assertGreater(
+            len(available_manuals), 
+            0, 
+            "FetchManualsTool returned no manuals"
+        )
