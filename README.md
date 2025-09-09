@@ -1,3 +1,8 @@
+# Introduction
+
+I am building this project to test the limits of "Vibe Coding" in multi-agent architecture. I will be using Codex and Github Copilot to create this project and will refrain from writing any code myself.
+As we have already created something similar (but more complex and confidential) at work, I am curious to see how far we can get with this approach.
+
 # Machine Bot
 
 Machine Bot is a Python project designed to answer and solve questions related to specific machines in a manufacturing environment. It leverages modern AI frameworks and cloud services for robust, scalable, and interactive solutions.
@@ -171,4 +176,4 @@ MIT
 Pull requests are welcome. For major changes, please open an issue first.
 
 ## Contact
-tbd
+ME
