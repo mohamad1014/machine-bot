@@ -1,4 +1,4 @@
-"""Integration test for :mod:`middleware.manuals_tool` using real Azure Blob."""
+"""Integration test for :mod:`middleware.manuals_tools` using real Azure Blob."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import os
 import unittest
 from pathlib import Path
 
-from middleware.manuals_tool import ManualMarkdownTool
+from middleware.manuals_tools import ManualsTool
 
 def test_print_env_vars():
     """Debug visibility of env vars used by tests."""
@@ -108,7 +108,7 @@ class TestManualsToolIntegration(unittest.TestCase):
         if not conn_str:
             self.fail("No connection string found in env or local.settings.json")
         container_name = os.environ.get("MANUALS_MD_CONTAINER", "manuals-md")
-        tool = ManualMarkdownTool(
+        tool = ManualsTool(
             connection_string=conn_str,
             container_name=container_name,
             fallback_path="/__does_not_exist__",
@@ -136,7 +136,7 @@ class TestManualsToolIntegration(unittest.TestCase):
             self.fail("No connection string found in env or local.settings.json")
         container_name = os.environ.get("MANUALS_MD_CONTAINER", "manuals-md")
         blob_name = "machine001.md"
-        tool = ManualMarkdownTool(
+        tool = ManualsTool(
             connection_string=conn_str,
             container_name=container_name,
             fallback_path="/__does_not_exist__",
@@ -163,7 +163,7 @@ class TestManualsToolIntegration(unittest.TestCase):
         blob_name = "machine001.md"
 
         # Preflight: ensure the blob is reachable via the tool's client; otherwise fail.
-        tool = ManualMarkdownTool(
+        tool = ManualsTool(
             connection_string=conn_str,
             container_name=container_name,
             fallback_path="/__does_not_exist__",
@@ -185,7 +185,7 @@ class TestManualsToolIntegration(unittest.TestCase):
         expected_text = data_path.read_text(encoding="utf-8")
 
         # Use the tool against the same resource (fallback disabled)
-        tool = ManualMarkdownTool(
+        tool = ManualsTool(
             connection_string=conn_str,
             container_name=container_name,
             fallback_path="/__does_not_exist__",
