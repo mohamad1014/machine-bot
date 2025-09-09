@@ -19,15 +19,15 @@ def conversation_run(req: func.HttpRequest) -> func.HttpResponse:
     try:
         body = req.get_json()
     except ValueError:
-        return func.HttpResponse(body="Invalid JSON", status_code=400)
+        return func.HttpResponse(body="Invalid JSON when parsing request body", status_code=400)
 
     if not isinstance(body, dict):
-        return func.HttpResponse(body="Invalid JSON", status_code=400)
-    
+        return func.HttpResponse(body="Invalid JSON when checking body type", status_code=400)
+
     input_data = body.get("input")
     logging.debug(f"Input data: {input_data}")
     if input_data is None:
-        return func.HttpResponse(body="Invalid input", status_code=400)
+        return func.HttpResponse(body="Invalid input when checking body content", status_code=400)
 
     global _agent
     if _agent is None:
