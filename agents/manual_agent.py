@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Agent that leverages Azure OpenAI and the manual lookup tool."""
+"""Agent that leverages Azure OpenAI and manual lookup tools."""
 
 import os
 from typing import Any
@@ -13,7 +13,7 @@ except Exception:  # pragma: no cover
     AzureChatOpenAI = None  # type: ignore[assignment]
     AgentExecutor = create_tool_calling_agent = ChatPromptTemplate = MessagesPlaceholder = None  # type: ignore
 
-from middleware.manuals_tool import ManualMarkdownTool
+from middleware.manuals_tools import ManualsTool, FetchManualsTool
 
 
 def create_manual_agent(
@@ -23,7 +23,7 @@ def create_manual_agent(
     fallback_path: str | None = None,
     deployment_name: str | None = None,
 ) -> "AgentExecutor":
-    """Create an agent wired with :class:`ManualMarkdownTool`.
+    """Create an agent wired with manuals tools.
 
     Parameters
     ----------
@@ -40,13 +40,18 @@ def create_manual_agent(
     Returns
     -------
     AgentExecutor
-        Configured agent capable of calling ``manual_markdown_lookup``.
+        Configured agent capable of calling ``manuals_tools`` and ``fetch_manuals``.
     """
 
     if AzureChatOpenAI is None or AgentExecutor is None:
         raise RuntimeError("langchain and langchain-openai must be installed")
 
-    tool = ManualMarkdownTool(
+    manuals_tool = ManualsTool(
+        connection_string=connection_string,
+        container_name=container_name,
+        fallback_path=fallback_path,
+    )
+    fetch_tool = FetchManualsTool(
         connection_string=connection_string,
         container_name=container_name,
         fallback_path=fallback_path,
@@ -62,13 +67,13 @@ def create_manual_agent(
         [
             (
                 "system",
-                "You are a helpful assistant. Use manual_markdown_lookup to fetch "
-                "machine manuals when relevant.",
+                "You are a helpful assistant. Use manuals_tools to fetch machine "
+                "manuals or fetch_manuals to list available manuals when relevant.",
             ),
-            ("user", "{input}\nMachine name: {machine_name}"),
+            ("user", "{input}"),
             MessagesPlaceholder("agent_scratchpad"),
         ]
     )
 
-    agent = create_tool_calling_agent(llm, [tool], prompt)
-    return AgentExecutor(agent=agent, tools=[tool], verbose=True)
+    agent = create_tool_calling_agent(llm, [manuals_tool, fetch_tool], prompt)
+    return AgentExecutor(agent=agent, tools=[manuals_tool, fetch_tool], verbose=True)
