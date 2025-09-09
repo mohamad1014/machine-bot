@@ -1,14 +1,40 @@
-# Python-generated files
+# Byte-compiled / cache
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.manifest
+*.spec
 
 # Virtual environments
-.venv
+.venv/
+env/
+venv/
 
+# Distribution / packaging
+dist/
+build/
+wheels/
+*.whl
+app.zip
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+.pyre/
+
+# Local settings and secrets
 local.settings.json
 .env
 .env.*

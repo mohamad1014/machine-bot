@@ -163,6 +163,14 @@ Configure local settings in `local.settings.json` (no secrets committed). Requir
 - `CosmosDbConnection`, `CosmosDatabase`, `CosmosContainer` (for Cosmos trigger)
 - `SqlConnectionString` (if using SQL access/bindings)
 
+### Deployment
+
+I recommend to deploy using the Azure CLI:
+```
+az functionapp deployment source config-zip --name <APP_NAME> --resource-group <RG> --src app.zip
+```
+
+Further deployments would be carried out using GitHub Actions. But for the first iterations I will do it manually.
 ### IaC (Bicep)
 
 Infrastructure templates are in `infra/`. See `infra/README.md` for parameters and deployment steps using `az deployment group create`.
