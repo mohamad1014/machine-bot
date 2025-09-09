@@ -65,7 +65,7 @@ def create_manual_agent(
                 "You are a helpful assistant. Use manual_markdown_lookup to fetch "
                 "machine manuals when relevant.",
             ),
-            ("user", "{input}\nMachine name: {machine_name}"),
+            ("user", "{input}"),
             MessagesPlaceholder("agent_scratchpad"),
         ]
     )
