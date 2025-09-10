@@ -1,0 +1,8 @@
+{
+  "displayName": "Manuals Agent",
+  "id": "manual_agent",
+  "description": "Create an agent wired with manuals tools. Used when information about manuals is needed",
+  "handover": ["dispatcher"],
+  "tools": ["ManualsTool", "FetchManualsTool"],
+  "model": "gpt4.1"
+}

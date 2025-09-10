@@ -1,0 +1,8 @@
+{
+  "displayName": "Dispatcher Agent",
+  "id": "dispatcher",
+  "description": "Routes user queries to the appropriate specialized agent.",
+  "handover": ["manual_agent", "maintenance_agent"],
+  "tools": [],
+  "model": "gpt4.1"
+}

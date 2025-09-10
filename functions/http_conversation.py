@@ -4,7 +4,7 @@ import logging
 import azure.functions as func
 from function_app import app
 
-from agents.manual_agent import create_manual_agent
+from agents.manual_agent import ManualAgent
 
 
 _agent = None
@@ -31,7 +31,7 @@ def conversation_run(req: func.HttpRequest) -> func.HttpResponse:
 
     global _agent
     if _agent is None:
-        _agent = create_manual_agent()
+        _agent = ManualAgent()
 
     result = _agent.invoke({"input": input_data})
     logging.debug(f"Agent result: {result}")
