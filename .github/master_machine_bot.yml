@@ -1,0 +1,52 @@
+# .github/workflows/deploy-azure-func.yml
+name: Deploy Python Azure Function (remote build)
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'   # your function project root
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Optional: keep this if you run lint/tests; not required for remote build.
+      #- name: Setup Python
+      #  uses: actions/setup-python@v5
+      #  with:
+      #    python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_28089542895F457197BE2F2E298FB399 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_CCC397997A8F4B9FA2C6D67560A9252E }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_452E1ABC0A164276A8A6F456F6D7D21D }}
+
+      # Ensure critical app settings are present (idempotent).
+      - name: Ensure app settings
+        run: |
+          az functionapp config appsettings set -g rg-machine-bot -n machine-bot --settings \
+            FUNCTIONS_WORKER_RUNTIME=python \
+            FUNCTIONS_EXTENSION_VERSION=~4
+
+      - name: Deploy (force remote Oryx build)
+        uses: Azure/functions-action@v1
+        with:
+          app-name: 'machine-bot'
+          slot-name: 'Production'
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          # These two inputs temporarily set SCM_DO_BUILD_DURING_DEPLOYMENT / ENABLE_ORYX_BUILD for this deploy
+          scm-do-build-during-deployment: true
+          enable-oryx-build: true
