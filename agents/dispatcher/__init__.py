@@ -8,23 +8,10 @@ agent. Sub-agents are exposed to the dispatcher as tools so that the LLM
 can decide when to call them.
 """
 
+import json
 from pathlib import Path
 
-from langchain.tools import Tool
-
 from ..vanilla_agent import VanillaAgent
-from ..manual_agent import ManualAgent
-from ..maintenance_agent import MaintenanceAgent
-
-
-def _agent_tool(agent: VanillaAgent) -> Tool:
-    """Wrap ``agent.invoke`` in a langchain :class:`Tool` returning plain text."""
-
-    def _run(input_text: str) -> str:
-        result = agent.invoke(input_text)
-        return result.get("output") if isinstance(result, dict) else str(result)
-
-    return Tool(name=agent.config["id"], description=agent.config["description"], func=_run)
 
 
 class DispatcherAgent(VanillaAgent):
@@ -32,13 +19,19 @@ class DispatcherAgent(VanillaAgent):
 
     def __init__(self) -> None:
         config_dir = Path(__file__).parent
-        manual = ManualAgent()
-        maintenance = MaintenanceAgent()
-        tools = [_agent_tool(manual), _agent_tool(maintenance)]
-        self.manual_agent = manual
-        self.maintenance_agent = maintenance
+        config_path = config_dir / "config.json"
+        instructions_path = config_dir / "instructions.md"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+
+        self.sub_agents: dict[str, VanillaAgent] = {}
+        tools = []
+        for agent_id in config.get("tools", []):
+            agent = VanillaAgent.from_id(agent_id)
+            self.sub_agents[agent_id] = agent
+            tools.append(agent.as_tool())
+
         super().__init__(
-            config_path=config_dir / "config.json",
-            instructions_path=config_dir / "instructions.md",
+            config_path=config_path,
+            instructions_path=instructions_path,
             tools=tools,
         )

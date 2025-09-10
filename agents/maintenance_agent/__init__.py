@@ -15,5 +15,4 @@ class MaintenanceAgent(VanillaAgent):
         super().__init__(
             config_path=config_dir / "config.json",
             instructions_path=config_dir / "instructions.md",
-            tools=[],
         )

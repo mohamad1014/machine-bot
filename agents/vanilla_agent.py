@@ -3,7 +3,8 @@ from __future__ import annotations
 """Base agent implementation shared by all agents."""
 
 import json
-import os
+from importlib import import_module
+import pkgutil
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -12,9 +13,10 @@ try:  # pragma: no cover - optional dependency
     from langchain.agents import AgentExecutor, create_tool_calling_agent
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain.memory import ConversationBufferMemory
+    from langchain.tools import Tool
 except Exception:  # pragma: no cover
     AzureChatOpenAI = None  # type: ignore[assignment]
-    AgentExecutor = create_tool_calling_agent = ChatPromptTemplate = MessagesPlaceholder = ConversationBufferMemory = None  # type: ignore
+    AgentExecutor = create_tool_calling_agent = ChatPromptTemplate = MessagesPlaceholder = ConversationBufferMemory = Tool = None  # type: ignore
 
 
 class VanillaAgent:
@@ -36,12 +38,14 @@ class VanillaAgent:
 
         self.config = json.loads(Path(config_path).read_text(encoding="utf-8"))
         system_prompt = Path(instructions_path).read_text(encoding="utf-8")
-        self.tools = list(tools or [])
+        if tools is None:
+            tools = self._load_tools_from_config()
+        self.tools = list(tools)
 
-        deployment_name = self.config.get("model") or os.environ.get(
-            "AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", "gpt-4o-mini"
-        )
-        llm = AzureChatOpenAI(deployment_name=deployment_name)
+        model_name = self.config.get("model")
+        if not model_name:
+            raise ValueError("model must be specified in config")
+        llm = AzureChatOpenAI(deployment_name=model_name)
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -65,3 +69,45 @@ class VanillaAgent:
         if isinstance(inputs, dict):
             return self._executor.invoke(inputs)
         return self._executor.invoke({"input": inputs})
+
+    # ------------------------------------------------------------------
+    # Tool and agent helpers
+    def as_tool(self) -> Tool:
+        """Expose this agent as a :class:`langchain.tools.Tool`."""
+
+        def _run(input_text: str) -> str:
+            result = self.invoke(input_text)
+            return result.get("output") if isinstance(result, dict) else str(result)
+
+        return Tool(
+            name=self.config["id"],
+            description=self.config.get("description", ""),
+            func=_run,
+        )
+
+    @staticmethod
+    def from_id(agent_id: str) -> "VanillaAgent":
+        """Instantiate an agent given its snake_case identifier."""
+        module = import_module(f"agents.{agent_id}")
+        class_name = "".join(part.capitalize() for part in agent_id.split("_"))
+        agent_cls = getattr(module, class_name)
+        return agent_cls()
+
+    # internal -----------------------------------------------------------
+    def _load_tools_from_config(self) -> list[Any]:
+        tool_names = self.config.get("tools", [])
+        loaded: list[Any] = []
+        for name in tool_names:
+            cls = self._resolve_tool_class(name)
+            loaded.append(cls())
+        return loaded
+
+    @staticmethod
+    def _resolve_tool_class(name: str):
+        import middleware
+
+        for _, module_name, _ in pkgutil.iter_modules(middleware.__path__):
+            module = import_module(f"middleware.{module_name}")
+            if hasattr(module, name):
+                return getattr(module, name)
+        raise ValueError(f"Tool {name} not found in middleware modules")
