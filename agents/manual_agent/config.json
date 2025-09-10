@@ -4,5 +4,5 @@
   "description": "Create an agent wired with manuals tools. Used when information about manuals is needed",
   "handover": ["dispatcher"],
   "tools": ["ManualsTool", "FetchManualsTool"],
-  "model": "gpt4.1"
+  "model": "gpt-4.1"
 }

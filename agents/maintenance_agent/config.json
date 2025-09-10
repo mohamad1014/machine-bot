@@ -4,5 +4,5 @@
   "description": "Handles maintenance queries and tasks.",
   "handover": ["dispatcher"],
   "tools": [],
-  "model": "gpt4.1"
+  "model": "gpt-4.1"
 }
