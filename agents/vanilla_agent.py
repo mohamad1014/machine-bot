@@ -11,9 +11,10 @@ try:  # pragma: no cover - optional dependency
     from langchain_openai import AzureChatOpenAI
     from langchain.agents import AgentExecutor, create_tool_calling_agent
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+    from langchain.memory import ConversationBufferMemory
 except Exception:  # pragma: no cover
     AzureChatOpenAI = None  # type: ignore[assignment]
-    AgentExecutor = create_tool_calling_agent = ChatPromptTemplate = MessagesPlaceholder = None  # type: ignore
+    AgentExecutor = create_tool_calling_agent = ChatPromptTemplate = MessagesPlaceholder = ConversationBufferMemory = None  # type: ignore
 
 
 class VanillaAgent:
@@ -45,13 +46,19 @@ class VanillaAgent:
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", system_prompt),
+                MessagesPlaceholder("chat_history"),
                 ("user", "{input}"),
                 MessagesPlaceholder("agent_scratchpad"),
             ]
         )
 
+        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
         agent = create_tool_calling_agent(llm, self.tools, prompt)
-        self._executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
+        self._executor = AgentExecutor(
+            agent=agent, tools=self.tools, verbose=True, memory=memory
+        )
+        self.memory = memory
 
     def invoke(self, inputs: dict[str, Any] | str) -> Any:
         """Invoke the agent with given ``inputs``."""

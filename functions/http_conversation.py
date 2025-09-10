@@ -4,7 +4,7 @@ import logging
 import azure.functions as func
 from function_app import app
 
-from agents.manual_agent import ManualAgent
+from agents.dispatcher import DispatcherAgent
 
 
 _agent = None
@@ -12,7 +12,7 @@ _agent = None
 
 @app.route(route="conversationRun", auth_level=func.AuthLevel.FUNCTION)
 def conversation_run(req: func.HttpRequest) -> func.HttpResponse:
-    """HTTP endpoint for running a manual agent conversation."""
+    """HTTP endpoint for running a dispatcher-driven conversation."""
 
     logging.info("HTTP conversationRun invoked")
 
@@ -31,7 +31,7 @@ def conversation_run(req: func.HttpRequest) -> func.HttpResponse:
 
     global _agent
     if _agent is None:
-        _agent = ManualAgent()
+        _agent = DispatcherAgent()
 
     result = _agent.invoke({"input": input_data})
     logging.debug(f"Agent result: {result}")

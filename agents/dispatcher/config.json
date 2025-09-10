@@ -3,6 +3,6 @@
   "id": "dispatcher",
   "description": "Routes user queries to the appropriate specialized agent.",
   "handover": ["manual_agent", "maintenance_agent"],
-  "tools": [],
+  "tools": ["manual_agent", "maintenance_agent"],
   "model": "gpt4.1"
 }
