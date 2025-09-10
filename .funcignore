@@ -8,6 +8,7 @@
 
 # Local dev / build artifacts
 .venv/
+venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -20,6 +21,7 @@ dist/
 build/
 wheels/
 app.zip
+release.zip
 
 # Config only used locally
 local.settings.json
@@ -34,3 +36,9 @@ requirements-dev.txt   # if you separate dev deps
 # Infrastructure / docs
 infra/
 *.md
+
+# GitHub Actions
+.github/
+
+# Tests
+tests/
