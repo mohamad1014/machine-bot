@@ -26,18 +26,27 @@ class VanillaAgent:
     construct any required tool instances.
     """
 
+    REGISTRY: dict[str, "VanillaAgent"] = {}
+
     def __init__(
         self,
         *,
         config_path: str | Path,
         instructions_path: str | Path,
         tools: Iterable[Any] | None = None,
+        memory: ConversationBufferMemory | None = None,
     ) -> None:
         if AzureChatOpenAI is None or AgentExecutor is None:
             raise RuntimeError("langchain and langchain-openai must be installed")
 
         self.config = json.loads(Path(config_path).read_text(encoding="utf-8"))
         system_prompt = Path(instructions_path).read_text(encoding="utf-8")
+
+        # shared memory across agents
+        self.memory = memory or ConversationBufferMemory(
+            memory_key="chat_history", return_messages=True
+        )
+
         if tools is None:
             tools = self._load_tools_from_config()
         self.tools = list(tools)
@@ -56,19 +65,32 @@ class VanillaAgent:
             ]
         )
 
-        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-
         agent = create_tool_calling_agent(llm, self.tools, prompt)
         self._executor = AgentExecutor(
-            agent=agent, tools=self.tools, verbose=True, memory=memory
+            agent=agent, tools=self.tools, verbose=True, memory=self.memory
         )
-        self.memory = memory
+
+        VanillaAgent.REGISTRY[self.config["id"]] = self
 
     def invoke(self, inputs: dict[str, Any] | str) -> Any:
-        """Invoke the agent with given ``inputs``."""
+        """Invoke the agent with given ``inputs`` and log tool usage."""
         if isinstance(inputs, dict):
-            return self._executor.invoke(inputs)
-        return self._executor.invoke({"input": inputs})
+            payload = inputs
+        else:
+            payload = {"input": inputs}
+
+        result = self._executor.invoke(
+            payload, return_intermediate_steps=True
+        )
+        steps = result.pop("intermediate_steps", [])
+        if steps:
+            lines = []
+            for action, observation in steps:
+                lines.append(
+                    f"tool={action.tool} input={action.tool_input!r} output={observation!r}"
+                )
+            self.memory.chat_memory.add_ai_message("\n".join(lines))
+        return result
 
     # ------------------------------------------------------------------
     # Tool and agent helpers
@@ -86,12 +108,12 @@ class VanillaAgent:
         )
 
     @staticmethod
-    def from_id(agent_id: str) -> "VanillaAgent":
+    def from_id(agent_id: str, *, memory: ConversationBufferMemory | None = None) -> "VanillaAgent":
         """Instantiate an agent given its snake_case identifier."""
         module = import_module(f"agents.{agent_id}")
         class_name = "".join(part.capitalize() for part in agent_id.split("_"))
         agent_cls = getattr(module, class_name)
-        return agent_cls()
+        return agent_cls(memory=memory)
 
     # internal -----------------------------------------------------------
     def _load_tools_from_config(self) -> list[Any]:
@@ -100,7 +122,24 @@ class VanillaAgent:
         for name in tool_names:
             cls = self._resolve_tool_class(name)
             loaded.append(cls())
+
+        for agent_id in self.config.get("handover", []):
+            loaded.append(self._agent_tool(agent_id))
         return loaded
+
+    # ------------------------------------------------------------------
+    def _agent_tool(self, agent_id: str) -> Tool:
+        """Create a tool proxy for another agent identified by ``agent_id``."""
+
+        def _run(input_text: str, *, agent_id: str = agent_id) -> str:
+            agent = VanillaAgent.REGISTRY.get(agent_id)
+            if agent is None:
+                agent = VanillaAgent.from_id(agent_id, memory=self.memory)
+            result = agent.invoke(input_text)
+            return result.get("output") if isinstance(result, dict) else str(result)
+
+        description = f"Handover to agent {agent_id}"
+        return Tool(name=agent_id, description=description, func=_run)
 
     @staticmethod
     def _resolve_tool_class(name: str):
