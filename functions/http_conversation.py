@@ -4,10 +4,11 @@ import logging
 import azure.functions as func
 from function_app import app
 
-from agents.dispatcher import DispatcherAgent
+from langchain_core.messages import HumanMessage
+from agents import build_graph, VanillaAgent
 
 
-_agent = None
+_graph = None
 
 
 @app.route(route="conversationRun", auth_level=func.AuthLevel.FUNCTION)
@@ -29,16 +30,17 @@ def conversation_run(req: func.HttpRequest) -> func.HttpResponse:
     if input_data is None:
         return func.HttpResponse(body="Invalid input when checking body content", status_code=400)
 
-    global _agent
-    if _agent is None:
-        _agent = DispatcherAgent()
+    global _graph
+    if _graph is None:
+        _graph = build_graph()
 
-    result = _agent.invoke({"input": input_data})
-    logging.debug(f"Agent result: {result}")
-    output = result.get("output") if isinstance(result, dict) else result
+    messages = [*VanillaAgent.MEMORY, HumanMessage(content=input_data)]
+    result = _graph.invoke({"messages": messages})
+    VanillaAgent.MEMORY = result.get("messages", messages)
+    output_msg = VanillaAgent.MEMORY[-1].content if VanillaAgent.MEMORY else ""
 
     return func.HttpResponse(
-        json.dumps({"output": output}),
+        json.dumps({"output": output_msg}),
         status_code=200,
         mimetype="application/json",
     )

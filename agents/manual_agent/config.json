@@ -3,6 +3,6 @@
   "id": "manual_agent",
   "description": "Create an agent wired with manuals tools. Used when information about manuals is needed",
   "handover": ["dispatcher"],
-  "tools": ["ManualsTool", "FetchManualsTool"],
+  "tools": ["manuals_tool", "fetch_manuals"],
   "model": "gpt-4.1"
 }

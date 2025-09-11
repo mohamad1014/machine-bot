@@ -201,3 +201,14 @@ class FetchManualsTool(BaseTool):
     async def _arun(self) -> str:  # type: ignore[override]
         raise NotImplementedError("FetchManualsTool does not support async")
 
+from langchain_core.tools import tool
+
+
+@tool("manuals_tool", description="Fetch a specific machine manual in markdown format.")
+def manuals_tool(machine_name: str) -> str:
+    return ManualsTool().run(machine_name=machine_name)
+
+
+@tool("fetch_manuals", description="List the names of manuals stored in the container.")
+def fetch_manuals() -> str:
+    return FetchManualsTool().run()
