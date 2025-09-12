@@ -9,12 +9,13 @@ from pathlib import Path
 from typing import Any
 
 from langchain_openai import AzureChatOpenAI
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
 from langgraph.graph import StateGraph, START, END, MessagesState
-from langgraph.prebuilt import ToolNode, InjectedState
+from langgraph.prebuilt import ToolNode, InjectedState, tools_condition
 from langgraph.types import Command
 from langchain_core.tools import tool, InjectedToolCallId
 from typing import Annotated
+from langchain_core.messages.utils import convert_to_openai_messages
 
 
 def create_handoff_tool(*, agent_name: str, description: str | None = None):
@@ -56,8 +57,9 @@ class VanillaAgent:
     ) -> None:
         self.config = json.loads(Path(config_path).read_text(encoding="utf-8"))
         self.instructions = Path(instructions_path).read_text(encoding="utf-8")
-
+        
         agent_id = self.config["id"]
+        
         VanillaAgent.REGISTRY[agent_id] = self
 
         self.tools: list[Any] = self._load_tools_from_config()
@@ -70,23 +72,34 @@ class VanillaAgent:
         model_name = self.config.get("model")
         if not model_name:
             raise ValueError("model must be specified in config")
-        self.llm = AzureChatOpenAI(deployment_name=model_name)
+        self.llm = AzureChatOpenAI(deployment_name=model_name).bind_tools(self.tools)
 
-        self.graph = self._build_graph()
+        self.graph = self._build_subgraph()
 
     # building ------------------------------------------------------------
-    def _build_graph(self):
+    def _build_subgraph(self):
         def call_model(state: MessagesState):
-            response = self.llm.invoke(state["messages"])
-            return {"messages": state["messages"] + [response]}
+            msgs = [SystemMessage(content=self.instructions)] + list(state["messages"])
+            msgs = convert_to_openai_messages(msgs)
+            response = self.llm.invoke(msgs)
+            airesponse = AIMessage(content=response.content, additional_kwargs=response.additional_kwargs, agent = self.config["displayName"])
+            # msg_to_append = AIMessage(response.content if response.content else str(response.additional_kwargs['tool_calls'][0]['function']))
+            return {"messages": state["messages"] + [airesponse]}
 
         graph = StateGraph(MessagesState)
         graph.add_node("llm", call_model)
         if self.tools:
             graph.add_node("tools", ToolNode(self.tools))
             graph.add_edge(START, "llm")
-            graph.add_edge("llm", "tools")
+            graph.add_conditional_edges(
+                                        "llm",
+                                        tools_condition,  # Routes to "tools" or "__end__"
+                                        {"tools": "tools", "__end__": "__end__"}
+                                    )
             graph.add_edge("tools", "llm")
+
+            # graph.add_edge("llm", "tools")
+            # graph.add_edge("tools", "llm")
         else:
             graph.add_edge(START, "llm")
         graph.add_edge("llm", END)
