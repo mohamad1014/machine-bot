@@ -1,0 +1,8 @@
+{
+  "displayName": "Maintenance Agent",
+  "id": "maintenance_agent",
+  "description": "Handles maintenance queries and tasks.",
+  "handover": [],
+  "tools": [],
+  "model": "gpt-4.1"
+}
