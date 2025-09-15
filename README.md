@@ -167,7 +167,7 @@ Configure local settings in `local.settings.json` (no secrets committed). Requir
 
 I recommend to deploy using the Azure CLI:
 ```
-az functionapp deployment source config-zip --name <APP_NAME> --resource-group <RG> --src app.zip
+func azure functionapp publish <APP-NAME> --resource-group <RG>
 ```
 
 Further deployments would be carried out using GitHub Actions. But for the first iterations I will do it manually.

@@ -121,7 +121,7 @@ class ManualsTool(BaseTool):
 
     # pylint: disable=unused-argument
     def _run(self, machine_name: str) -> str:  # type: ignore[override]
-        blob_name = f"{machine_name}.md"
+        blob_name = machine_name if machine_name.endswith(".md") else f"{machine_name}.md"
         
         # Try Azure Blob Storage directly (without langchain loaders to avoid unstructured dependency)
         if self.connection_string and BlobServiceClient is not None:
@@ -143,7 +143,7 @@ class ManualsTool(BaseTool):
         manual_file = self.fallback_path / blob_name
         if manual_file.exists():
             return manual_file.read_text(encoding="utf-8")
-        return "machine file not found"
+        return f"Machine file '{manual_file}' not found"
 
     async def _arun(self, machine_name: str) -> str:  # type: ignore[override]
         raise NotImplementedError("ManualsTool does not support async")
@@ -201,3 +201,14 @@ class FetchManualsTool(BaseTool):
     async def _arun(self) -> str:  # type: ignore[override]
         raise NotImplementedError("FetchManualsTool does not support async")
 
+from langchain_core.tools import tool
+
+
+@tool("manuals_tool", description="Fetch a specific machine manual in markdown format.")
+def manuals_tool(machine_name: str) -> str:
+    return ManualsTool().run(machine_name=machine_name)
+
+
+@tool("fetch_manuals", description="List the names of manuals stored in the container.")
+def fetch_manuals() -> str:
+    return FetchManualsTool().run()
