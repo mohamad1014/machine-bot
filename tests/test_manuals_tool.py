@@ -7,6 +7,8 @@ import os
 import unittest
 from pathlib import Path
 
+import pytest
+
 from middleware.manuals_tools import ManualsTool, FetchManualsTool
 
 def test_print_env_vars():
@@ -99,17 +101,26 @@ def _load_local_settings(path: Path) -> None:
     except Exception:
         # best-effort only
         pass
+CONNECTION_STRING = _load_connection_string()
+if CONNECTION_STRING is None:
+    pytest.skip(
+        "Azure storage connection string not configured", allow_module_level=True
+    )
+try:
+    from azure.storage.blob import BlobServiceClient
+    BlobServiceClient.from_connection_string(CONNECTION_STRING).get_service_properties()
+except Exception:
+    pytest.skip(
+        "Azure storage not reachable", allow_module_level=True
+    )
 
 
 class TestManualsToolIntegration(unittest.TestCase):
     def test_azure_storage_available(self) -> None:
         """Assert Azure SDK import and connection produce a container client."""
-        conn_str = _load_connection_string()
-        if not conn_str:
-            self.fail("No connection string found in env or local.settings.json")
         container_name = os.environ.get("MANUALS_MD_CONTAINER", "manuals-md")
         tool = ManualsTool(
-            connection_string=conn_str,
+            connection_string=CONNECTION_STRING,
             container_name=container_name,
             fallback_path="/__does_not_exist__",
         )
@@ -119,9 +130,7 @@ class TestManualsToolIntegration(unittest.TestCase):
         )
     def test_connection_string_presence(self) -> None:
         """Test that a connection string is present."""
-        conn_str = _load_connection_string()
-        if not conn_str:
-            self.fail("No connection string found in env or local.settings.json")
+        assert CONNECTION_STRING
 
     def test_local_data_file_presence(self) -> None:
         """Test that the local data file exists."""
@@ -131,13 +140,10 @@ class TestManualsToolIntegration(unittest.TestCase):
 
     def test_blob_existence(self) -> None:
         """Test that the blob exists in Azure Blob Storage."""
-        conn_str = _load_connection_string()
-        if not conn_str:
-            self.fail("No connection string found in env or local.settings.json")
         container_name = os.environ.get("MANUALS_MD_CONTAINER", "manuals-md")
         blob_name = "machine001.md"
         tool = ManualsTool(
-            connection_string=conn_str,
+            connection_string=CONNECTION_STRING,
             container_name=container_name,
             fallback_path="/__does_not_exist__",
         )
@@ -154,17 +160,12 @@ class TestManualsToolIntegration(unittest.TestCase):
 
     def test_fetch_machine001_via_azure_blob(self) -> None:
         """Fetches manuals-md/machine001.md via real Azure Blob and compares output."""
-
-        conn_str = _load_connection_string()
-        if not conn_str:
-            self.fail("No connection string found in env or local.settings.json")
-
         container_name = os.environ.get("MANUALS_MD_CONTAINER", "manuals-md")
         blob_name = "machine001.md"
 
         # Preflight: ensure the blob is reachable via the tool's client; otherwise fail.
         tool = ManualsTool(
-            connection_string=conn_str,
+            connection_string=CONNECTION_STRING,
             container_name=container_name,
             fallback_path="/__does_not_exist__",
         )
@@ -186,7 +187,7 @@ class TestManualsToolIntegration(unittest.TestCase):
 
         # Use the tool against the same resource (fallback disabled)
         tool = ManualsTool(
-            connection_string=conn_str,
+            connection_string=CONNECTION_STRING,
             container_name=container_name,
             fallback_path="/__does_not_exist__",
         )
@@ -197,10 +198,6 @@ class TestManualsToolIntegration(unittest.TestCase):
 
     def test_fetch_manuals_tool_lists_expected_files(self) -> None:
         """Test that FetchManualsTool returns the expected manual files."""
-        
-        conn_str = _load_connection_string()
-        if not conn_str:
-            self.fail("No connection string found in env or local.settings.json")
         
         container_name = os.environ.get("MANUALS_MD_CONTAINER", "manuals-md")
         
@@ -220,7 +217,7 @@ class TestManualsToolIntegration(unittest.TestCase):
         
         # Use FetchManualsTool to get the list of available manuals
         tool = FetchManualsTool(
-            connection_string=conn_str,
+            connection_string=CONNECTION_STRING,
             container_name=container_name,
             fallback_path="/__does_not_exist__",
         )
