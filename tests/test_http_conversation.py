@@ -1,97 +1,70 @@
-#TODO: Rewerite these tests to use pytest well
+"""Tests for the HTTP conversation Azure Function."""
+from __future__ import annotations
 
-# import json
-# import pytest
+import json
 
-# func = pytest.importorskip("azure.functions")
+import azure.functions as func
+from langchain_core.messages import AIMessage, HumanMessage
 
-# from functions.http_conversation import conversation_run
-
-
-# class DummyAgent:
-#     """Simple agent that returns a pre-defined result regardless of input."""
-
-#     def __init__(self, result: dict):
-#         self._result = result
-
-#     # Support multiple calling styles
-#     def run(self, *_, **__):
-#         return self._result
-
-#     def respond(self, *_, **__):
-#         return self._result
-
-#     def __call__(self, *_, **__):
-#         return self._result
+from functions import http_conversation
+from agents import VanillaAgent
 
 
-# def _make_request(body: dict) -> func.HttpRequest:
-#     return func.HttpRequest(
-#         method="POST",
-#         url="/api/conversationRun",
-#         headers={"Content-Type": "application/json"},
-#         params={},
-#         route_params={},
-#         body=json.dumps(body).encode(),
-#     )
+class DummyGraph:
+    def __init__(self, result):
+        self._result = result
+
+    def invoke(self, state):  # pragma: no cover - simple passthrough
+        return self._result
 
 
-# def test_conversation_run_plain_text(monkeypatch):
-#     expected = {
-#         "id": "1",
-#         "type": "message",
-#         "role": "assistant",
-#         "content": [{"type": "output_text", "text": "text response"}],
-#     }
-#     agent = DummyAgent(expected)
-#     # Patch whichever creation path is used by the function
-#     monkeypatch.setattr(
-#         "functions.http_conversation.create_manual_agent",
-#         lambda: agent,
-#         raising=False,
-#     )
-#     monkeypatch.setattr(
-#         "functions.http_conversation.agent",
-#         agent,
-#         raising=False,
-#     )
-#     req = _make_request({"input": "hello"})
-#     resp = conversation_run(req)
-#     assert resp.status_code == 200
-#     assert json.loads(resp.get_body()) == expected
+def _make_request(body: dict) -> func.HttpRequest:
+    return func.HttpRequest(
+        method="POST",
+        url="/api/conversationRun",
+        headers={"Content-Type": "application/json"},
+        params={},
+        route_params={},
+        body=json.dumps(body).encode(),
+    )
 
 
-# def test_conversation_run_multimodal(monkeypatch):
-#     expected = {
-#         "id": "2",
-#         "type": "message",
-#         "role": "assistant",
-#         "content": [{"type": "output_text", "text": "image response"}],
-#     }
-#     agent = DummyAgent(expected)
-#     monkeypatch.setattr(
-#         "functions.http_conversation.create_manual_agent",
-#         lambda: agent,
-#         raising=False,
-#     )
-#     monkeypatch.setattr(
-#         "functions.http_conversation.agent",
-#         agent,
-#         raising=False,
-#     )
-#     req = _make_request(
-#         {
-#             "input": [
-#                 {
-#                     "role": "user",
-#                     "content": [
-#                         {"type": "input_text", "text": "describe"},
-#                         {"type": "input_image", "image_url": "https://example.com/cat.png"},
-#                     ],
-#                 }
-#             ]
-#         }
-#     )
-#     resp = conversation_run(req)
-#     assert resp.status_code == 200
-#     assert json.loads(resp.get_body()) == expected
+def test_conversation_run_plain_text(monkeypatch):
+    result = {
+        "messages": [HumanMessage(content="hello"), AIMessage(content="text response")]
+    }
+    monkeypatch.setattr(http_conversation, "_graph", DummyGraph(result))
+    VanillaAgent.MEMORY = []
+    req = _make_request({"input": "hello"})
+    resp = http_conversation.conversation_run(req)
+    assert resp.status_code == 200
+    assert json.loads(resp.get_body()) == {"output": "text response"}
+
+
+def test_conversation_run_multimodal(monkeypatch):
+    result = {
+        "messages": [
+            HumanMessage(
+                content=[
+                    {"type": "text", "text": "describe"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "https://example.com/cat.png"},
+                    },
+                ]
+            ),
+            AIMessage(content="image response"),
+        ]
+    }
+    monkeypatch.setattr(http_conversation, "_graph", DummyGraph(result))
+    VanillaAgent.MEMORY = []
+    body = {
+        "input": [
+            {"type": "text", "text": "describe"},
+            {"type": "image_url", "image_url": {"url": "https://example.com/cat.png"}},
+        ]
+    }
+    req = _make_request(body)
+    resp = http_conversation.conversation_run(req)
+    assert resp.status_code == 200
+    assert json.loads(resp.get_body()) == {"output": "image response"}
