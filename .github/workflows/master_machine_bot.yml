@@ -30,9 +30,9 @@ jobs:
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_28089542895F457197BE2F2E298FB399 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_CCC397997A8F4B9FA2C6D67560A9252E }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_452E1ABC0A164276A8A6F456F6D7D21D }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_AB9B6FBFBA384298827B5D6A0C153A50 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_6D366B8CFAC046B1989EA505D62FB990 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_231AD8DF29854FF7A49C46F940D2D2AE }}
 
       # Ensure critical app settings are present (idempotent).
       - name: Ensure app settings
