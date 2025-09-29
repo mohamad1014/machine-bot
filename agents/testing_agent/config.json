@@ -1,0 +1,8 @@
+{
+  "displayName": "Testing Agent",
+  "id": "testing_agent",
+  "description": "Agent designed to exercise Azure AI Search integrations and surface test knowledge.",
+  "handover": [],
+  "tools": ["azure_ai_search"],
+  "model": "gpt-4.1"
+}
