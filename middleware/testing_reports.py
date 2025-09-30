@@ -97,6 +97,7 @@ class TestingReportsSearchTool(BaseTool):
     top_k: int = 5
     vector_field: Optional[str] = None
     index_env_var: Optional[str] = None
+    api_version: str = "2023-11-01"
     _retriever: Any = PrivateAttr(default=None)
 
     def __init__(
@@ -109,6 +110,7 @@ class TestingReportsSearchTool(BaseTool):
         top_k: Optional[int] = None,
         vector_field: Optional[str] = None,
         retriever: Any | None = None,
+        api_version: Optional[str] = None,
     ) -> None:
         super().__init__()
         self.endpoint = endpoint or os.environ.get("AZURE_SEARCH_ENDPOINT")
@@ -128,6 +130,11 @@ class TestingReportsSearchTool(BaseTool):
         except (TypeError, ValueError):  # pragma: no cover - defensive parsing
             self.top_k = 5
         self.vector_field = vector_field or os.environ.get("AZURE_SEARCH_VECTOR_FIELD")
+        self.api_version = (
+            api_version
+            or os.environ.get("AZURE_SEARCH_API_VERSION")
+            or "2023-11-01"
+        )
         if retriever is not None:
             self._retriever = retriever
             if self.vector_field and hasattr(self._retriever, "vector_field"):
@@ -145,27 +152,22 @@ class TestingReportsSearchTool(BaseTool):
         """Instantiate a LangChain retriever if dependencies are available."""
 
         try:  # pragma: no cover - optional dependency surface
-            from langchain_community.retrievers import AzureCognitiveSearchRetriever
+            from langchain_community.retrievers import AzureAISearchRetriever
         except Exception:
             return None
         selected_index = index_name or self.index_name
         if not all([self.endpoint, self.api_key, selected_index]):
             return None
         kwargs: dict[str, Any] = {
-            "endpoint": self.endpoint,
-            "api_key": self.api_key,
+            "service_name": self.endpoint,
+            "api_key": self.api_key or "",
             "index_name": selected_index,
             "content_key": self.content_key,
             "top_k": self.top_k,
+            "api_version": self.api_version,
         }
-        if self.vector_field is not None:
-            kwargs["vector_field"] = self.vector_field
         try:
-            try:
-                retriever = AzureCognitiveSearchRetriever(**kwargs)
-            except TypeError:  # pragma: no cover - retry without vector_field
-                kwargs.pop("vector_field", None)
-                retriever = AzureCognitiveSearchRetriever(**kwargs)
+            retriever = AzureAISearchRetriever(**kwargs)
             if self.vector_field and hasattr(retriever, "vector_field"):
                 setattr(retriever, "vector_field", self.vector_field)
             return retriever

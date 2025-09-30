@@ -99,3 +99,31 @@ def test_tool_supports_index_override():
     tool.run({"query": "metallurgy", "index_name": "metallurgy-index"})
 
     assert getattr(retriever, "index_name", None) == "metallurgy-index"
+
+
+def test_tool_uses_azure_ai_search_retriever(monkeypatch):
+    created_kwargs: dict[str, object] = {}
+
+    class DummyRetriever(FakeRetriever):
+        def __init__(self, *args, **kwargs):
+            created_kwargs.update(kwargs)
+            super().__init__(documents=[])
+
+    monkeypatch.setenv(
+        "AZURE_SEARCH_ENDPOINT", "https://bearing-search.search.windows.net"
+    )
+    monkeypatch.setenv("AZURE_SEARCH_API_KEY", "test-key")
+    monkeypatch.setenv("AZURE_SEARCH_INDEX_NAME", "bearing-index")
+    monkeypatch.setenv("AZURE_SEARCH_API_VERSION", "2024-05-01-Preview")
+    monkeypatch.setattr(
+        "langchain_community.retrievers.AzureAISearchRetriever",
+        DummyRetriever,
+    )
+
+    tool = testing_reports.TestingReportsSearchTool(retriever=None)
+
+    assert tool._retriever is not None
+    assert created_kwargs["service_name"] == "https://bearing-search.search.windows.net"
+    assert created_kwargs["api_key"] == "test-key"
+    assert created_kwargs["index_name"] == "bearing-index"
+    assert created_kwargs["api_version"] == "2024-05-01-Preview"
