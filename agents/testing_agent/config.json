@@ -1,0 +1,8 @@
+{
+  "displayName": "Testing Agent",
+  "id": "testing_agent",
+  "description": "Agent dedicated to locating and summarizing physical bearing testing reports.",
+  "handover": [],
+  "tools": ["testing_reports_search"],
+  "model": "gpt-4.1"
+}
