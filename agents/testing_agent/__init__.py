@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Testing agent focused on exercising Azure AI Search tools."""
+"""Testing agent focused on bearing testing reports retrieval tools."""
 
 from pathlib import Path
 
@@ -8,7 +8,7 @@ from ..vanilla_agent import VanillaAgent
 
 
 class TestingAgent(VanillaAgent):
-    """Agent wired with Azure AI Search retrieval tools."""
+    """Agent wired with tools for retrieving physical testing reports."""
 
     def __init__(self) -> None:
         config_dir = Path(__file__).parent

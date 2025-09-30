@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage
 
 import agents.vanilla_agent as vanilla_agent
 from agents.testing_agent import TestingAgent
-from middleware import azure_search_tools
+from middleware import testing_reports
 
 
 class FakeListChatModel:
@@ -26,7 +26,7 @@ class FakeListChatModel:
 class StubTool:
     """Tool stub that records invocations and returns canned payloads."""
 
-    name = "azure_ai_search"
+    name = "testing_reports_search"
 
     def __init__(self, payload: str) -> None:
         self.payload = payload
@@ -48,7 +48,7 @@ def _build_tool_calling_model(payload: str) -> FakeListChatModel:
                 {
                     "id": "call_1",
                     "function": {
-                        "name": "azure_ai_search",
+                        "name": "testing_reports_search",
                         "arguments": json.dumps({"query": "test query"}),
                     },
                 }
@@ -62,7 +62,9 @@ def _build_tool_calling_model(payload: str) -> FakeListChatModel:
 def test_testing_agent_invokes_search_tool(monkeypatch):
     payload = "Result payload"
     fake_tool = StubTool(payload)
-    monkeypatch.setattr(azure_search_tools, "AzureAISearchTool", lambda **_: fake_tool)
+    monkeypatch.setattr(
+        testing_reports, "TestingReportsSearchTool", lambda **_: fake_tool
+    )
     fake_model = _build_tool_calling_model(payload)
     monkeypatch.setattr(vanilla_agent, "AzureChatOpenAI", lambda **_: fake_model)
     vanilla_agent.VanillaAgent.MEMORY = []
@@ -83,8 +85,10 @@ def test_testing_agent_invokes_search_tool(monkeypatch):
 
 
 def test_testing_agent_reports_no_results(monkeypatch):
-    fake_tool = StubTool("No relevant information found in Azure AI Search.")
-    monkeypatch.setattr(azure_search_tools, "AzureAISearchTool", lambda **_: fake_tool)
+    fake_tool = StubTool("No relevant testing reports were found in Azure AI Search.")
+    monkeypatch.setattr(
+        testing_reports, "TestingReportsSearchTool", lambda **_: fake_tool
+    )
     fake_model = _build_tool_calling_model("unused")
     monkeypatch.setattr(vanilla_agent, "AzureChatOpenAI", lambda **_: fake_model)
     vanilla_agent.VanillaAgent.MEMORY = []
@@ -98,4 +102,4 @@ def test_testing_agent_reports_no_results(monkeypatch):
         if message.__class__.__name__ == "ToolMessage"
     ]
     assert tool_messages
-    assert "No relevant information" in tool_messages[-1].content
+    assert "No relevant testing reports" in tool_messages[-1].content
