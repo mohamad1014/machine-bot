@@ -42,23 +42,6 @@ except Exception:  # pragma: no cover
     def PrivateAttr(default: Any = None) -> Any:
         return default
 
-_MISSING = object()
-_RETRIEVER_CLS: Any = _MISSING
-
-
-def _get_retriever_cls() -> Any | None:
-    """Dynamically import the Azure retriever only when required."""
-
-    global _RETRIEVER_CLS  # noqa: PLW0603 - cache for repeated calls
-    if _RETRIEVER_CLS is _MISSING:
-        try:  # pragma: no cover - optional dependency surface
-            from langchain_community.retrievers import AzureCognitiveSearchRetriever
-        except Exception:
-            _RETRIEVER_CLS = None
-        else:
-            _RETRIEVER_CLS = AzureCognitiveSearchRetriever
-    return None if _RETRIEVER_CLS is None else _RETRIEVER_CLS
-
 from langchain_core.tools import tool
 
 
@@ -118,7 +101,6 @@ class TestingReportsSearchTool(BaseTool):
 
     def __init__(
         self,
-        *,
         endpoint: Optional[str] = None,
         api_key: Optional[str] = None,
         index_name: Optional[str] = None,
@@ -162,8 +144,9 @@ class TestingReportsSearchTool(BaseTool):
     def _build_retriever(self, *, index_name: Optional[str] = None) -> Any | None:
         """Instantiate a LangChain retriever if dependencies are available."""
 
-        retriever_cls = _get_retriever_cls()
-        if retriever_cls is None:
+        try:  # pragma: no cover - optional dependency surface
+            from langchain_community.retrievers import AzureCognitiveSearchRetriever
+        except Exception:
             return None
         selected_index = index_name or self.index_name
         if not all([self.endpoint, self.api_key, selected_index]):
@@ -179,10 +162,10 @@ class TestingReportsSearchTool(BaseTool):
             kwargs["vector_field"] = self.vector_field
         try:
             try:
-                retriever = retriever_cls(**kwargs)
+                retriever = AzureCognitiveSearchRetriever(**kwargs)
             except TypeError:  # pragma: no cover - retry without vector_field
                 kwargs.pop("vector_field", None)
-                retriever = retriever_cls(**kwargs)
+                retriever = AzureCognitiveSearchRetriever(**kwargs)
             if self.vector_field and hasattr(retriever, "vector_field"):
                 setattr(retriever, "vector_field", self.vector_field)
             return retriever
@@ -255,20 +238,28 @@ class TestingReportsSearchTool(BaseTool):
                 self.index_name = index_name
             self._retriever = self._build_retriever(index_name=self.index_name)
         if self._retriever is None:
+            resolved_index = index_name or self.index_name
             index_identifier = self.index_env_var or "AZURE_SEARCH_INDEX_NAME"
             missing = [
                 name
                 for name, value in (
                     ("AZURE_SEARCH_ENDPOINT", self.endpoint),
                     ("AZURE_SEARCH_API_KEY", self.api_key),
-                    (index_identifier, index_name or self.index_name),
+                    (index_identifier, resolved_index),
                 )
                 if not value
             ]
-            missing_env = ", ".join(missing)
+            resolved_repr = (
+                "TestingReportsSearchTool("
+                f"endpoint={self.endpoint!r}, "
+                f"api_key={self.api_key!r}, "
+                f"index_name={resolved_index!r}, "
+                f"index_env_var={(self.index_env_var or '')!r})"
+            )
+            detail = f" Missing settings: {', '.join(missing)}" if missing else ""
             raise RuntimeError(
-                "Azure AI Search retriever is not configured for testing reports."
-                + (f" Missing settings: {missing_env}" if missing_env else "")
+                "Azure AI Search retriever is not configured for testing reports. "
+                f"Resolved configuration: {resolved_repr}.{detail}"
             )
         if index_name and hasattr(self._retriever, "index_name"):
             try:

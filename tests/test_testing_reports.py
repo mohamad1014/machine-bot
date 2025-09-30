@@ -53,6 +53,7 @@ def test_tool_missing_configuration(monkeypatch):
         tool.run(query="status")
 
     assert "not configured" in str(exc_info.value)
+    assert "Resolved configuration: TestingReportsSearchTool" in str(exc_info.value)
 
 
 def test_tool_respects_top_k(monkeypatch):
