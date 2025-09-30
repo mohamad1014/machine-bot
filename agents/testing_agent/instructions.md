@@ -11,4 +11,3 @@ Operational notes:
 - Prefer structured summaries organized by report or test date.
 - Include metadata fields such as `source`, `test_rig`, or `bearing_size` when available in the results.
 - Encourage follow-up searches across alternate indexes (e.g., endurance, vibration, metallurgy) when initial results are sparse.
-- Do not fabricate data; if search returns nothing, state that explicitly.
