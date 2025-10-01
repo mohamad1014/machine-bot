@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from typing import List, Tuple
+from uuid import uuid4
 
 import gradio as gr
 import requests
@@ -47,11 +48,12 @@ def handle_message(
     history: List[Tuple[str, str]],
     api_base: str,
     api_key: str,
-) -> Tuple[List[Tuple[str, str]], str]:
+    conversation_id: str,
+) -> Tuple[List[Tuple[str, str]], str, str]:
     """Send the user's message to the API and append the response to history."""
 
     if not message.strip():
-        return history, ""
+        return history, "", conversation_id
 
     base_url = _normalize_base_url(api_base)
     # If api_key is provided, append as ?code=... to the endpoint
@@ -61,34 +63,40 @@ def handle_message(
     try:
         data = _post_json(
             run_url,
-            {"input": message},
+            {"input": message, "conversation_id": conversation_id},
         )
         bot_reply = str(data.get("output", ""))
+        remote_conversation_id = data.get("conversation_id")
+        if isinstance(remote_conversation_id, str) and remote_conversation_id.strip():
+            conversation_id = remote_conversation_id.strip()
     except (requests.RequestException, ValueError) as exc:
         bot_reply = f"Error contacting API: {exc}"
 
     updated_history = history + [(message, bot_reply)]
-    return updated_history, ""
+    return updated_history, "", conversation_id
 
 
-def reset_conversation(api_base: str, api_key: str) -> Tuple[List[Tuple[str, str]], str]:
+def reset_conversation(
+    api_base: str, api_key: str, conversation_id: str
+) -> Tuple[List[Tuple[str, str]], str, str]:
     """Clear both the UI history and the shared server-side memory."""
 
     base_url = _normalize_base_url(api_base)
     reset_url = f"{base_url}/{RESET_ENDPOINT}"
     if api_key.strip():
         reset_url += f"?code={api_key.strip()}"
+    new_conversation_id = str(uuid4())
     try:
         _post_json(
             reset_url,
-            payload=None,
+            payload={"conversation_id": conversation_id} if conversation_id else None,
             timeout=10,
         )
-        gr.Info("Conversation reset.")
+        gr.Info(f"Conversation reset. New session id: {new_conversation_id}")
     except (requests.RequestException, ValueError) as exc:
         gr.Warning(f"Unable to reset remote conversation: {exc}")
 
-    return [], ""
+    return [], "", new_conversation_id
 
 
 def update_api_base(new_base: str) -> str:
@@ -128,6 +136,7 @@ with gr.Blocks(title="Machine Bot Chat") as demo:
 
     chatbot = gr.Chatbot(label="Conversation", type="tuples")
     message_box = gr.Textbox(label="Message", placeholder="Ask about a machine...", lines=2)
+    conversation_state = gr.State(str(uuid4()))
 
     with gr.Row():
         send_button = gr.Button("Send", variant="primary")
@@ -137,19 +146,19 @@ with gr.Blocks(title="Machine Bot Chat") as demo:
 
     send_button.click(
         fn=handle_message,
-        inputs=[message_box, chatbot, api_base_input, function_key_input],
-        outputs=[chatbot, message_box],
+        inputs=[message_box, chatbot, api_base_input, function_key_input, conversation_state],
+        outputs=[chatbot, message_box, conversation_state],
     )
     message_box.submit(
         fn=handle_message,
-        inputs=[message_box, chatbot, api_base_input, function_key_input],
-        outputs=[chatbot, message_box],
+        inputs=[message_box, chatbot, api_base_input, function_key_input, conversation_state],
+        outputs=[chatbot, message_box, conversation_state],
     )
 
     new_session_button.click(
         fn=reset_conversation,
-        inputs=[api_base_input, function_key_input],
-        outputs=[chatbot, message_box],
+        inputs=[api_base_input, function_key_input, conversation_state],
+        outputs=[chatbot, message_box, conversation_state],
     )
 
 
