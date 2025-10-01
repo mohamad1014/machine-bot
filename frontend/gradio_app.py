@@ -34,8 +34,7 @@ def _post_json(
 ) -> dict[str, object]:
     """Send a JSON POST request and return the parsed response."""
 
-    headers = {"x-functions-key": api_key} if api_key else None
-    response = requests.post(url, json=payload, timeout=timeout, headers=headers)
+    response = requests.post(url, json=payload, timeout=timeout)
     response.raise_for_status()
     try:
         return response.json()
@@ -55,11 +54,14 @@ def handle_message(
         return history, ""
 
     base_url = _normalize_base_url(api_base)
+    # If api_key is provided, append as ?code=... to the endpoint
+    run_url = f"{base_url}/{RUN_ENDPOINT}"
+    if api_key.strip():
+        run_url += f"?code={api_key.strip()}"
     try:
         data = _post_json(
-            f"{base_url}/{RUN_ENDPOINT}",
+            run_url,
             {"input": message},
-            api_key=api_key.strip() or None,
         )
         bot_reply = str(data.get("output", ""))
     except (requests.RequestException, ValueError) as exc:
@@ -73,12 +75,14 @@ def reset_conversation(api_base: str, api_key: str) -> Tuple[List[Tuple[str, str
     """Clear both the UI history and the shared server-side memory."""
 
     base_url = _normalize_base_url(api_base)
+    reset_url = f"{base_url}/{RESET_ENDPOINT}"
+    if api_key.strip():
+        reset_url += f"?code={api_key.strip()}"
     try:
         _post_json(
-            f"{base_url}/{RESET_ENDPOINT}",
+            reset_url,
             payload=None,
             timeout=10,
-            api_key=api_key.strip() or None,
         )
         gr.Info("Conversation reset.")
     except (requests.RequestException, ValueError) as exc:
@@ -115,11 +119,11 @@ with gr.Blocks(title="Machine Bot Chat") as demo:
         ),
     )
 
-    api_key_input = gr.Textbox(
+    function_key_input = gr.Textbox(
         value=DEFAULT_API_KEY,
-        label="API key (optional)",
+        label="Function URL code (optional)",
         type="password",
-        placeholder="Function key for protected endpoints",
+        placeholder="Azure Functions ?code=... value",
     )
 
     chatbot = gr.Chatbot(label="Conversation", type="tuples")
@@ -133,18 +137,18 @@ with gr.Blocks(title="Machine Bot Chat") as demo:
 
     send_button.click(
         fn=handle_message,
-        inputs=[message_box, chatbot, api_base_input, api_key_input],
+        inputs=[message_box, chatbot, api_base_input, function_key_input],
         outputs=[chatbot, message_box],
     )
     message_box.submit(
         fn=handle_message,
-        inputs=[message_box, chatbot, api_base_input, api_key_input],
+        inputs=[message_box, chatbot, api_base_input, function_key_input],
         outputs=[chatbot, message_box],
     )
 
     new_session_button.click(
         fn=reset_conversation,
-        inputs=[api_base_input, api_key_input],
+        inputs=[api_base_input, function_key_input],
         outputs=[chatbot, message_box],
     )
 
