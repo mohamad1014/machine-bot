@@ -54,7 +54,9 @@ uv sync
 - **Telegram**: Interact with the bot by sending questions about your machines.
 - **Gradio**: Access the web UI for demonstrations and manual queries.
 - **Local Gradio frontend**: Run `uv run python -m frontend.gradio_app` to launch a chat UI against your
-  local Azure Functions host or a deployed API.
+  local Azure Functions host or a deployed API. Provide the API base URL and, if the endpoint is secured
+  with a function key, enter it in the optional **API key** field (or set `MACHINE_BOT_API_KEY` to
+  pre-populate the value).
 
 ## Example
 
