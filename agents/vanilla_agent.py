@@ -23,7 +23,7 @@ from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode, InjectedState, tools_condition
 from langgraph.types import Command
 from langchain_core.tools import tool, InjectedToolCallId
-from typing import Annotated
+from typing import Annotated, Sequence
 from langchain_core.messages.utils import convert_to_openai_messages
 
 
@@ -115,15 +115,26 @@ class VanillaAgent:
         return graph.compile()
 
     # invocation ---------------------------------------------------------
-    def invoke(self, inputs: dict[str, Any] | str) -> Any:
-        if isinstance(inputs, dict):
-            input_text = inputs.get("input", "")
+    def invoke(
+        self,
+        inputs: dict[str, Any] | str,
+        *,
+        history: Sequence[BaseMessage] | None = None,
+    ) -> Any:
+        if isinstance(inputs, dict) and "messages" in inputs:
+            raw_messages = inputs["messages"]
+            if isinstance(raw_messages, Sequence) and not isinstance(raw_messages, (str, bytes)):
+                messages = list(raw_messages)
+            else:
+                messages = [raw_messages]
         else:
-            input_text = inputs
-        messages = [*VanillaAgent.MEMORY, HumanMessage(content=input_text)]
-        result = self.graph.invoke({"messages": messages})
-        VanillaAgent.MEMORY = result.get("messages", messages)
-        return result
+            messages = list(history or [])
+            if isinstance(inputs, dict):
+                if "input" in inputs and inputs["input"] is not None:
+                    messages.append(HumanMessage(content=inputs["input"]))
+            else:
+                messages.append(HumanMessage(content=inputs))
+        return self.graph.invoke({"messages": messages})
 
     # helpers ------------------------------------------------------------
     @staticmethod
