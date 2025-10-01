@@ -53,6 +53,10 @@ uv sync
 
 - **Telegram**: Interact with the bot by sending questions about your machines.
 - **Gradio**: Access the web UI for demonstrations and manual queries.
+- **Local Gradio frontend**: Run `uv run python -m frontend.gradio_app` to launch a chat UI against your
+  local Azure Functions host or a deployed API. Provide the API base URL and, if the endpoint is secured
+  with a function key, enter it in the optional **API key** field (or set `MACHINE_BOT_API_KEY` to
+  pre-populate the value).
 
 ## Example
 
@@ -81,26 +85,16 @@ import gradio as gr
 
 ### `POST /api/conversationRun`
 
-Invoke the conversational model via an HTTP POST. The endpoint accepts either
-pure text messages or mixed text+image content and returns the model's
-response.
-
-**Required environment variables**
-
-- `AZURE_OPENAI_ENDPOINT` – endpoint URL for your Azure OpenAI deployment
-- `AZURE_OPENAI_API_KEY` – API key for the Azure OpenAI resource
-- `AzureWebJobsStorage` – Azure Storage connection string used by the function
-
-#### Text request
+Invoke the conversational model via an HTTP POST. The body must include an
+`input` field containing the user's message. The function maintains the shared
+conversation history in memory.
 
 ```http
 POST /api/conversationRun
 Content-Type: application/json
 
 {
-  "messages": [
-    {"role": "user", "content": "What is the status of machine 42?"}
-  ]
+  "input": "What is the status of machine 42?"
 }
 ```
 
@@ -108,48 +102,27 @@ Example response:
 
 ```json
 {
-  "choices": [
-    {
-      "message": {
-        "role": "assistant",
-        "content": "Machine 42 is idle."
-      }
-    }
-  ]
+  "output": "Machine 42 is idle."
 }
 ```
 
-#### Image request
+### `POST /api/conversationReset`
+
+Reset the shared conversation state. This is useful when starting a brand-new
+session from the Gradio UI or another client.
 
 ```http
-POST /api/conversationRun
+POST /api/conversationReset
 Content-Type: application/json
 
-{
-  "messages": [
-    {
-      "role": "user",
-      "content": [
-        {"type": "text", "text": "Inspect this component"},
-        {"type": "image_url", "image_url": {"url": "https://example.com/photo.jpg"}}
-      ]
-    }
-  ]
-}
+{}
 ```
 
 Example response:
 
 ```json
 {
-  "choices": [
-    {
-      "message": {
-        "role": "assistant",
-        "content": "The component shows signs of wear on the belt."
-      }
-    }
-  ]
+  "status": "reset"
 }
 ```
 
