@@ -56,7 +56,8 @@ uv sync
 - **Local Gradio frontend**: Run `uv run python -m frontend.gradio_app` to launch a chat UI against your
   local Azure Functions host or a deployed API. Provide the API base URL and, if the endpoint is secured
   with a function key, enter it in the optional **API key** field (or set `MACHINE_BOT_API_KEY` to
-  pre-populate the value).
+  pre-populate the value). The UI now keeps a per-session `conversation_id` and includes it in all
+  requests so that other integrations can correlate transcripts in the same way.
 
 ## Example
 
@@ -86,43 +87,57 @@ import gradio as gr
 ### `POST /api/conversationRun`
 
 Invoke the conversational model via an HTTP POST. The body must include an
-`input` field containing the user's message. The function maintains the shared
-conversation history in memory.
+`input` field containing the user's message. Provide a stable `conversation_id`
+per client session to scope the shared conversation state; the Gradio frontend
+initializes a UUID and reuses it until the session is reset.
+
+Each invocation loads the full transcript for the provided `conversation_id` from
+Cosmos DB, appends the new message, executes the agent graph, and persists the
+updated transcript back to Cosmos. Reusing the same identifier maintains
+conversation continuity, while using a different one isolates history.
 
 ```http
 POST /api/conversationRun
 Content-Type: application/json
 
 {
-  "input": "What is the status of machine 42?"
+  "input": "What is the status of machine 42?",
+  "conversation_id": "2b6d1d22-5a02-4d8a-b17a-112233445566"
 }
 ```
 
-Example response:
+Example response (latest assistant reply):
 
 ```json
 {
-  "output": "Machine 42 is idle."
+  "output": "Machine 42 is idle.",
+  "conversation_id": "2b6d1d22-5a02-4d8a-b17a-112233445566"
 }
 ```
 
 ### `POST /api/conversationReset`
 
-Reset the shared conversation state. This is useful when starting a brand-new
-session from the Gradio UI or another client.
+Request a fresh `conversation_id`. Optionally include the previous identifier
+if you want it echoed back in the response. The prior transcript is left in
+Cosmos DB so that historical conversations remain available for auditing or
+future retrieval.
 
 ```http
 POST /api/conversationReset
 Content-Type: application/json
 
-{}
+{
+  "conversation_id": "2b6d1d22-5a02-4d8a-b17a-112233445566"
+}
 ```
 
 Example response:
 
 ```json
 {
-  "status": "reset"
+  "status": "reset",
+  "conversation_id": "c783b8ac-5e53-4af2-9bcb-73cf43c8ce19",
+  "previous_conversation_id": null
 }
 ```
 
@@ -135,6 +150,10 @@ Configure local settings in `local.settings.json` (no secrets committed). Requir
 - `AzureWebJobsStorage` (for local emulator or real storage)
 - `CosmosDbConnection`, `CosmosDatabase`, `CosmosContainer` (for Cosmos trigger)
 - `SqlConnectionString` (if using SQL access/bindings)
+
+The Cosmos container now stores per-conversation transcripts keyed by the
+`conversation_id` you pass to the HTTP API. Provision it with an `/id` partition
+key (the default in `infra/main.bicep`) to align with the persistence model.
 
 ### Deployment
 
