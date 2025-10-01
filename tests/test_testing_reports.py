@@ -102,7 +102,6 @@ def test_tool_supports_index_override():
 
     assert getattr(retriever, "index_name", None) == "metallurgy-index"
 
-
 def test_tool_returns_tool_message_when_tool_call_id():
     tool = testing_reports.TestingReportsSearchTool(retriever=FakeRetriever([]))
 

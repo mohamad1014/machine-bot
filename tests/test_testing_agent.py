@@ -52,7 +52,6 @@ class StubTool:
     def __call__(self, *args: Any, **kwargs: Any) -> str:
         return self.run(*args, **kwargs)
 
-
 def _build_tool_calling_model(payload: str) -> FakeListChatModel:
     tool_call_message = AIMessage(
         content="",
