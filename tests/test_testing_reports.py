@@ -4,6 +4,8 @@ import types
 
 import pytest
 
+from langchain_core.messages import ToolMessage
+
 from middleware import testing_reports
 
 
@@ -99,6 +101,16 @@ def test_tool_supports_index_override():
     tool.run({"query": "metallurgy", "index_name": "metallurgy-index"})
 
     assert getattr(retriever, "index_name", None) == "metallurgy-index"
+
+
+def test_tool_returns_tool_message_when_tool_call_id():
+    tool = testing_reports.TestingReportsSearchTool(retriever=FakeRetriever([]))
+
+    result = tool.run({"query": "status"}, tool_call_id="call_1")
+
+    assert isinstance(result, ToolMessage)
+    assert result.tool_call_id == "call_1"
+    assert "No relevant testing reports" in result.content
 
 
 def test_tool_uses_azure_ai_search_retriever(monkeypatch):
