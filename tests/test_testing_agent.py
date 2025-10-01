@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 
 import pytest
+from typing import Any
+
 from langchain_core.messages import AIMessage
 
 import agents.vanilla_agent as vanilla_agent
@@ -26,19 +28,29 @@ class FakeListChatModel:
 class StubTool:
     """Tool stub that records invocations and returns canned payloads."""
 
-    name = "testing_reports_search"
+    name: str = "testing_reports_search"
+    payload: str = ""
+    instances: list["StubTool"] = []
 
-    def __init__(self, payload: str) -> None:
-        self.payload = payload
+    def __init__(self, **kwargs: Any) -> None:
         self.calls: list[dict[str, str]] = []
+        self.config = kwargs
+        StubTool.instances.append(self)
 
-    def run(self, *args, **kwargs):  # type: ignore[unused-argument]
+    def run(self, *args: Any, **kwargs: Any) -> str:  # type: ignore[unused-argument]
         if args and isinstance(args[0], dict):
             self.calls.append(args[0])
         elif "query" in kwargs:
             self.calls.append({"query": kwargs["query"]})
+        else:
+            self.calls.append({"args": list(args), "kwargs": dict(kwargs)})
         return self.payload
 
+    def invoke(self, args: dict[str, Any]) -> str:
+        return self.run(args)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> str:
+        return self.run(*args, **kwargs)
 
 def _build_tool_calling_model(payload: str) -> FakeListChatModel:
     tool_call_message = AIMessage(
@@ -61,10 +73,10 @@ def _build_tool_calling_model(payload: str) -> FakeListChatModel:
 
 def test_testing_agent_invokes_search_tool(monkeypatch):
     payload = "Result payload"
-    fake_tool = StubTool(payload)
-    monkeypatch.setattr(
-        testing_reports, "TestingReportsSearchTool", lambda **_: fake_tool
-    )
+    StubTool.payload = payload
+    StubTool.instances = []
+    monkeypatch.setattr(testing_reports, "TestingReportsSearchTool", StubTool)
+    monkeypatch.setenv("TESTING_AGENT_SEARCH_INDEX", "bearing-testing-index")
     fake_model = _build_tool_calling_model(payload)
     monkeypatch.setattr(vanilla_agent, "AzureChatOpenAI", lambda **_: fake_model)
     vanilla_agent.VanillaAgent.MEMORY = []
@@ -73,6 +85,8 @@ def test_testing_agent_invokes_search_tool(monkeypatch):
 
     result = agent.invoke({"input": "Find calibration steps"})
 
+    assert StubTool.instances, "Tool should be instantiated from configuration."
+    tool_instance = StubTool.instances[-1]
     tool_messages = [
         message
         for message in result["messages"]
@@ -81,14 +95,16 @@ def test_testing_agent_invokes_search_tool(monkeypatch):
     assert tool_messages, "The tool message should be present in the conversation."
     assert payload in tool_messages[0].content
     assert result["messages"][-1].content == "Search complete"
-    assert fake_tool.calls and fake_tool.calls[0]["query"] == "test query"
+    assert tool_instance.calls and tool_instance.calls[0]["query"] == "test query"
+    assert tool_instance.config["index_env_var"] == "TESTING_AGENT_SEARCH_INDEX"
+    assert tool_instance.config["content_key"] == "content"
 
 
 def test_testing_agent_reports_no_results(monkeypatch):
-    fake_tool = StubTool("No relevant testing reports were found in Azure AI Search.")
-    monkeypatch.setattr(
-        testing_reports, "TestingReportsSearchTool", lambda **_: fake_tool
-    )
+    StubTool.payload = "No relevant testing reports were found in Azure AI Search."
+    StubTool.instances = []
+    monkeypatch.setattr(testing_reports, "TestingReportsSearchTool", StubTool)
+    monkeypatch.setenv("TESTING_AGENT_SEARCH_INDEX", "bearing-testing-index")
     fake_model = _build_tool_calling_model("unused")
     monkeypatch.setattr(vanilla_agent, "AzureChatOpenAI", lambda **_: fake_model)
     vanilla_agent.VanillaAgent.MEMORY = []

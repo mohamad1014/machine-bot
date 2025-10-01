@@ -38,3 +38,7 @@ htmlcov/
 local.settings.json
 .env
 .env.*
+
+
+# Manual http calls
+rest.http

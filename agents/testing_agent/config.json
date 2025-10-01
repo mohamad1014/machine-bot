@@ -3,6 +3,16 @@
   "id": "testing_agent",
   "description": "Agent dedicated to locating and summarizing physical bearing testing reports.",
   "handover": [],
-  "tools": ["testing_reports_search"],
+  "tools": [
+    {
+      "name": "TestingReportsSearchTool",
+      "config": {
+        "index_env_var": "TESTING_AGENT_SEARCH_INDEX",
+        "content_key": "content",
+        "top_k": 5,
+        "vector_field": null
+      }
+    }
+  ],
   "model": "gpt-4.1"
 }

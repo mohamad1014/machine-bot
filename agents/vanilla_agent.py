@@ -8,6 +8,15 @@ import pkgutil
 from pathlib import Path
 from typing import Any
 
+try:  # pragma: no cover - optional dependency during minimal installs
+    from langchain_core.tools import BaseTool as LangChainBaseTool
+except Exception:  # pragma: no cover - fallback for tooling-free envs
+    class LangChainBaseTool:  # type: ignore[too-many-ancestors]
+        """Lightweight stand-in when LangChain is unavailable."""
+
+        def __init__(self, *args, **kwargs) -> None:  # noqa: D401
+            raise RuntimeError("LangChain BaseTool is required for tool configuration")
+
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
 from langgraph.graph import StateGraph, START, END, MessagesState
@@ -125,18 +134,53 @@ class VanillaAgent:
         return agent_cls()
 
     def _load_tools_from_config(self) -> list[Any]:
-        tool_names = self.config.get("tools", [])
+        tool_entries = self.config.get("tools", [])
         loaded: list[Any] = []
-        for name in tool_names:
-            loaded.append(self._resolve_tool(name))
+        for entry in tool_entries:
+            if isinstance(entry, str):
+                loaded.append(self._resolve_tool(entry, config=None))
+            elif isinstance(entry, dict):
+                name = entry.get("name")
+                if not name:
+                    raise ValueError("Tool configuration objects must include a 'name'.")
+                config = entry.get("config") or {}
+                loaded.append(self._resolve_tool(name, config=config))
+            else:
+                raise TypeError(
+                    "Each tool entry must be either a string name or a mapping with a 'name'."
+                )
         return loaded
 
     @staticmethod
-    def _resolve_tool(name: str):
+    def _resolve_tool(name: str, *, config: dict[str, Any] | None):
         import middleware
 
         for _, module_name, _ in pkgutil.iter_modules(middleware.__path__):
             module = import_module(f"middleware.{module_name}")
             if hasattr(module, name):
-                return getattr(module, name)
+                tool = getattr(module, name)
+                return VanillaAgent._apply_tool_config(tool, config)
         raise ValueError(f"Tool {name} not found in middleware modules")
+
+    @staticmethod
+    def _apply_tool_config(tool: Any, config: dict[str, Any] | None):
+        if isinstance(tool, type):
+            if issubclass(tool, LangChainBaseTool):
+                return tool(**(config or {}))
+            if config is None:
+                return tool()
+            return tool(**config)
+        if isinstance(tool, LangChainBaseTool):
+            if not config:
+                return tool
+            for key, value in config.items():
+                setattr(tool, key, value)
+            return tool
+        if config:
+            configure = getattr(tool, "configure", None)
+            if callable(configure):
+                return configure(**config)
+            raise ValueError(
+                f"Tool {getattr(tool, 'name', repr(tool))} does not support configuration"
+            )
+        return tool

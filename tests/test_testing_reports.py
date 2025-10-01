@@ -4,6 +4,8 @@ import types
 
 import pytest
 
+from langchain_core.messages import ToolMessage
+
 from middleware import testing_reports
 
 
@@ -12,6 +14,7 @@ class FakeRetriever:
         self._documents = list(documents)
         self.received_queries: list[str] = []
         self.top_k = len(self._documents)
+        self.vector_field = None
 
     def get_relevant_documents(self, query):
         self.received_queries.append(query)
@@ -52,6 +55,7 @@ def test_tool_missing_configuration(monkeypatch):
         tool.run(query="status")
 
     assert "not configured" in str(exc_info.value)
+    assert "Resolved configuration: TestingReportsSearchTool" in str(exc_info.value)
 
 
 def test_tool_respects_top_k(monkeypatch):
@@ -61,12 +65,31 @@ def test_tool_respects_top_k(monkeypatch):
         FakeDocument(page_content="Result 3", metadata={}),
     ]
     retriever = FakeRetriever(docs)
-    tool = testing_reports.TestingReportsSearchTool(retriever=retriever)
+    tool = testing_reports.TestingReportsSearchTool(
+        retriever=retriever, vector_field="search_vector"
+    )
 
     tool.run({"query": "anything", "top_k": 1})
 
     assert retriever.top_k == 1
     assert retriever.received_queries == ["anything"]
+    assert retriever.vector_field == "search_vector"
+
+
+def test_tool_reads_index_from_custom_env(monkeypatch):
+    monkeypatch.setenv("BEARING_SEARCH_INDEX", "bearing-reports")
+    tool = testing_reports.TestingReportsSearchTool(
+        retriever=FakeRetriever([]),
+        index_env_var="BEARING_SEARCH_INDEX",
+        top_k=7,
+        content_key="body",
+        vector_field="embedding_field",
+    )
+
+    assert tool.index_name == "bearing-reports"
+    assert tool.top_k == 7
+    assert tool.content_key == "body"
+    assert tool.vector_field == "embedding_field"
 
 
 def test_tool_supports_index_override():
@@ -78,3 +101,40 @@ def test_tool_supports_index_override():
     tool.run({"query": "metallurgy", "index_name": "metallurgy-index"})
 
     assert getattr(retriever, "index_name", None) == "metallurgy-index"
+
+def test_tool_returns_tool_message_when_tool_call_id():
+    tool = testing_reports.TestingReportsSearchTool(retriever=FakeRetriever([]))
+
+    result = tool.run({"query": "status"}, tool_call_id="call_1")
+
+    assert isinstance(result, ToolMessage)
+    assert result.tool_call_id == "call_1"
+    assert "No relevant testing reports" in result.content
+
+
+def test_tool_uses_azure_ai_search_retriever(monkeypatch):
+    created_kwargs: dict[str, object] = {}
+
+    class DummyRetriever(FakeRetriever):
+        def __init__(self, *args, **kwargs):
+            created_kwargs.update(kwargs)
+            super().__init__(documents=[])
+
+    monkeypatch.setenv(
+        "AZURE_SEARCH_ENDPOINT", "https://bearing-search.search.windows.net"
+    )
+    monkeypatch.setenv("AZURE_SEARCH_API_KEY", "test-key")
+    monkeypatch.setenv("AZURE_SEARCH_INDEX_NAME", "bearing-index")
+    monkeypatch.setenv("AZURE_SEARCH_API_VERSION", "2024-05-01-Preview")
+    monkeypatch.setattr(
+        "langchain_community.retrievers.AzureAISearchRetriever",
+        DummyRetriever,
+    )
+
+    tool = testing_reports.TestingReportsSearchTool(retriever=None)
+
+    assert tool._retriever is not None
+    assert created_kwargs["service_name"] == "https://bearing-search.search.windows.net"
+    assert created_kwargs["api_key"] == "test-key"
+    assert created_kwargs["index_name"] == "bearing-index"
+    assert created_kwargs["api_version"] == "2024-05-01-Preview"

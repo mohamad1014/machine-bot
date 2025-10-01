@@ -42,3 +42,6 @@ infra/
 
 # Tests
 tests/
+
+# Manual http calls
+rest.http
