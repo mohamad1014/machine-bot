@@ -42,6 +42,7 @@ except Exception:  # pragma: no cover
     def PrivateAttr(default: Any = None) -> Any:
         return default
 
+from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 
 
@@ -175,7 +176,7 @@ class TestingReportsSearchTool(BaseTool):
             return None
 
     # ------------------------------------------------------------------
-    def run(self, *args: Any, **kwargs: Any) -> str:  # noqa: D401 - wrapper
+    def run(self, *args: Any, **kwargs: Any) -> str | ToolMessage:  # noqa: D401 - wrapper
         """Support multiple invocation styles for compatibility with LangChain."""
 
         query: Optional[str] = None
@@ -212,7 +213,15 @@ class TestingReportsSearchTool(BaseTool):
         index_name = kwargs.get("index_name", index_name)
         if query is None:
             raise TypeError("Missing required argument 'query'")
-        return self._run(query=query, top_k=top_k, index_name=index_name)
+        result = self._run(query=query, top_k=top_k, index_name=index_name)
+        tool_call_id = kwargs.get("tool_call_id")
+        if tool_call_id:
+            return ToolMessage(
+                content=result,
+                name=self.name,
+                tool_call_id=tool_call_id,
+            )
+        return result
 
     # pylint: disable=unused-argument
     def _run(
