@@ -6,9 +6,10 @@ from .vanilla_agent import VanillaAgent
 from .manual_agent import ManualAgent
 from .maintenance_agent import MaintenanceAgent
 from .dispatcher_agent import DispatcherAgent
+from .testing_agent import TestingAgent
 from langgraph.prebuilt import tools_condition
 
-def build_graph(entry_id: str = "dispatcher_agent"):
+def build_graph(entry_id: str = "testing_agent"):
     """Build the global multi-agent graph connecting the agent subgraphs starting from the given entry."""
     VanillaAgent.REGISTRY.clear()
     VanillaAgent.MEMORY = []
@@ -39,5 +40,6 @@ __all__ = [
     "ManualAgent",
     "MaintenanceAgent",
     "DispatcherAgent",
+    "TestingAgent",
     "build_graph",
 ]
