@@ -44,3 +44,25 @@ def conversation_run(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200,
         mimetype="application/json",
     )
+
+
+@app.route(
+    route="conversationReset",
+    methods=["POST"],
+    auth_level=func.AuthLevel.FUNCTION,
+)
+def conversation_reset(req: func.HttpRequest) -> func.HttpResponse:
+    """HTTP endpoint for clearing shared conversation state."""
+
+    logging.info("HTTP conversationReset invoked")
+
+    VanillaAgent.MEMORY = []
+
+    global _graph
+    _graph = None
+
+    return func.HttpResponse(
+        json.dumps({"status": "reset"}),
+        status_code=200,
+        mimetype="application/json",
+    )
