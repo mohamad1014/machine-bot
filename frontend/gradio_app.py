@@ -122,7 +122,7 @@ with gr.Blocks(title="Machine Bot Chat") as demo:
         placeholder="Function key for protected endpoints",
     )
 
-    chatbot = gr.Chatbot(label="Conversation", type="tuple")
+    chatbot = gr.Chatbot(label="Conversation", type="tuples")
     message_box = gr.Textbox(label="Message", placeholder="Ask about a machine...", lines=2)
 
     with gr.Row():
