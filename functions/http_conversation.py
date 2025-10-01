@@ -1,14 +1,23 @@
 import json
 import logging
+import uuid
 
 import azure.functions as func
 from function_app import app
 
-from langchain_core.messages import HumanMessage
-from agents import build_graph, VanillaAgent
+from langchain_core.messages import AIMessage, HumanMessage
+from agents import build_graph
+from middleware.conversation_store import ConversationStore
 
 
 _graph = None
+_store: ConversationStore | None = None
+
+def _get_store() -> ConversationStore:
+    global _store
+    if _store is None:
+        _store = ConversationStore()
+    return _store
 
 
 @app.route(route="conversationRun", auth_level=func.AuthLevel.FUNCTION)
@@ -25,6 +34,11 @@ def conversation_run(req: func.HttpRequest) -> func.HttpResponse:
     if not isinstance(body, dict):
         return func.HttpResponse(body="Invalid JSON when checking body type", status_code=400)
 
+    conversation_id = body.get("conversation_id")
+    if not isinstance(conversation_id, str) or not conversation_id.strip():
+        return func.HttpResponse(body="conversation_id is required", status_code=400)
+    conversation_id = conversation_id.strip()
+
     input_data = body.get("input")
     logging.debug(f"Input data: {input_data}")
     if input_data is None:
@@ -34,10 +48,18 @@ def conversation_run(req: func.HttpRequest) -> func.HttpResponse:
     if _graph is None:
         _graph = build_graph()
 
-    messages = [*VanillaAgent.MEMORY, HumanMessage(content=input_data)]
+    store = _get_store()
+    history = list(store.load_messages(conversation_id))
+    messages = [*history, HumanMessage(content=input_data)]
     result = _graph.invoke({"messages": messages})
-    VanillaAgent.MEMORY = result.get("messages", messages)
-    output_msg = VanillaAgent.MEMORY[-1].content if VanillaAgent.MEMORY else ""
+    result_messages = list(result.get("messages", messages))
+    store.save_messages(conversation_id, result_messages)
+
+    output_msg: object = ""
+    for message in reversed(result_messages):
+        if isinstance(message, AIMessage):
+            output_msg = message.content
+            break
 
     return func.HttpResponse(
         json.dumps({"output": output_msg}),
@@ -56,13 +78,33 @@ def conversation_reset(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info("HTTP conversationReset invoked")
 
-    VanillaAgent.MEMORY = []
+    try:
+        body = req.get_json()
+    except ValueError:
+        return func.HttpResponse(body="Invalid JSON when parsing request body", status_code=400)
+
+    if not isinstance(body, dict):
+        return func.HttpResponse(body="Invalid JSON when checking body type", status_code=400)
+
+    conversation_id = body.get("conversation_id")
+    if conversation_id is not None:
+        if not isinstance(conversation_id, str) or not conversation_id.strip():
+            return func.HttpResponse(body="conversation_id is required", status_code=400)
+        conversation_id = conversation_id.strip()
+
+    new_conversation_id = str(uuid.uuid4())
 
     global _graph
     _graph = None
 
     return func.HttpResponse(
-        json.dumps({"status": "reset"}),
+        json.dumps(
+            {
+                "status": "reset",
+                "conversation_id": new_conversation_id,
+                "previous_conversation_id": conversation_id,
+            }
+        ),
         status_code=200,
         mimetype="application/json",
     )

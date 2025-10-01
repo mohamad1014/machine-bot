@@ -11,7 +11,8 @@ Parameters (main.bicep)
 - `location`: Azure region (e.g., `westeurope`)
 - `namePrefix`: Prefix for resource names (lowercase, letters and digits)
 - `cosmosDbName`: Cosmos DB database name
-- `cosmosContainerName`: Cosmos DB container name
+- `cosmosContainerName`: Cosmos DB container name (stores per-conversation
+  transcripts partitioned by `/id`)
 - `sqlAdminLogin` / `sqlAdminPassword`: SQL admin credentials
 - `manualsMdConnectionString`: Connection string for manuals markdown storage (blob container)
 - `azureOpenAiEndpoint`: Azure OpenAI endpoint URL
