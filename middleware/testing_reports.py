@@ -97,7 +97,7 @@ class TestingReportsSearchTool(BaseTool):
     top_k: int = 5
     vector_field: Optional[str] = None
     index_env_var: Optional[str] = None
-    api_version: str = "2023-11-01"
+    api_version: Optional[str] = None
     _retriever: Any = PrivateAttr(default=None)
 
     def __init__(
@@ -220,7 +220,7 @@ class TestingReportsSearchTool(BaseTool):
     ) -> str:  # type: ignore[override]
         retriever = self._ensure_retriever(index_name=index_name)
         self._configure_top_k(retriever, top_k)
-        documents = retriever.get_relevant_documents(query)
+        documents = retriever.invoke(query)
         formatted = self._format_documents(documents)
         if not formatted:
             return "No relevant testing reports were found in Azure AI Search."
