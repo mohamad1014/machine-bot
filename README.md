@@ -56,7 +56,8 @@ uv sync
 - **Local Gradio frontend**: Run `uv run python -m frontend.gradio_app` to launch a chat UI against your
   local Azure Functions host or a deployed API. Provide the API base URL and, if the endpoint is secured
   with a function key, enter it in the optional **API key** field (or set `MACHINE_BOT_API_KEY` to
-  pre-populate the value).
+  pre-populate the value). The UI now keeps a per-session `conversation_id` and includes it in all
+  requests so that other integrations can correlate transcripts in the same way.
 
 ## Example
 
@@ -85,11 +86,10 @@ import gradio as gr
 
 ### `POST /api/conversationRun`
 
-Invoke the conversational model via an HTTP POST. The body must include:
-
-- `conversation_id`: Stable identifier for the transcript (per user/session).
-- `input`: The latest user utterance. This value may be text or a multimodal
-  payload compatible with LangChain's `HumanMessage`.
+Invoke the conversational model via an HTTP POST. The body must include an
+`input` field containing the user's message. Provide a stable `conversation_id`
+per client session to scope the shared conversation state; the Gradio frontend
+initializes a UUID and reuses it until the session is reset.
 
 Each invocation loads the full transcript for the provided `conversation_id` from
 Cosmos DB, appends the new message, executes the agent graph, and persists the
@@ -101,8 +101,8 @@ POST /api/conversationRun
 Content-Type: application/json
 
 {
-  "conversation_id": "demo-42",
-  "input": "What is the status of machine 42?"
+  "input": "What is the status of machine 42?",
+  "conversation_id": "2b6d1d22-5a02-4d8a-b17a-112233445566"
 }
 ```
 
@@ -110,7 +110,8 @@ Example response (latest assistant reply):
 
 ```json
 {
-  "output": "Machine 42 is idle."
+  "output": "Machine 42 is idle.",
+  "conversation_id": "2b6d1d22-5a02-4d8a-b17a-112233445566"
 }
 ```
 
@@ -125,7 +126,9 @@ future retrieval.
 POST /api/conversationReset
 Content-Type: application/json
 
-{}
+{
+  "conversation_id": "2b6d1d22-5a02-4d8a-b17a-112233445566"
+}
 ```
 
 Example response:
