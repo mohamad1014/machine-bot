@@ -7,18 +7,13 @@
     {
       "name": "DoclingDocumentSearchTool",
       "config": {
-        "index_env_var": "DOCLING_DOCUMENTS_INDEX"
+        "index_env_var": "TESTING_AGENT_SEARCH_INDEX"
       }
     },
     {
       "name": "DoclingDocumentContentTool",
       "config": {
-        "index_env_var": "DOCLING_DOCUMENTS_INDEX",
-        "metadata_fields": [
-          "abstract",
-          "tags",
-          "source_url"
-        ]
+        "container_env_var": "CosmosTestDocumentsContainer"
       }
     }
   ],

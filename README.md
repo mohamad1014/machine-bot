@@ -52,7 +52,7 @@ uv sync
 4. Provide Azure AI Search settings for the document index:
    - `AZURE_SEARCH_ENDPOINT`
    - `AZURE_SEARCH_API_KEY`
-   - `DOCLING_DOCUMENTS_INDEX` (or reuse `AZURE_SEARCH_INDEX_NAME`)
+   - `TESTING_AGENT_SEARCH_INDEX` (or reuse `AZURE_SEARCH_INDEX_NAME`)
    - (Optional) `AZURE_SEARCH_API_VERSION`
 
 ### Usage

@@ -48,7 +48,8 @@ def test_docling_document_search_builds_payload_and_trims_results(azure_search_k
                     "abstract": "Summary of accelerated life testing.",
                     "content": "This field should not be returned.",
                 }
-            ]
+            ],
+            "@odata.count": 1,
         }
     )
     tool = DoclingDocumentSearchTool(
@@ -60,19 +61,16 @@ def test_docling_document_search_builds_payload_and_trims_results(azure_search_k
     input_data = DoclingDocumentSearchInput(
         query="fatigue testing",
         tags=["bearing", "life"],
-        min_mean_score=0.5,
-        source_urls=["https://contoso"],
     )
     result = tool.run(input_data)
     payload = requester.calls[-1][2]
 
     assert payload["select"] == "document_id,title,abstract"
     assert "tags/any" in payload["filter"]
-    assert "mean_score ge 0.5" in payload["filter"]
-    assert "source_url eq 'https://contoso'" in payload["filter"]
-
-    parsed = json.loads(result)
+    content = result.content if hasattr(result, "content") else result
+    parsed = json.loads(content)
     assert parsed["request"]["search"] == "fatigue testing"
+    assert parsed["@odata.count"] == 1
     assert parsed["results"] == [
         {
             "document_id": "doc-1",
@@ -83,68 +81,70 @@ def test_docling_document_search_builds_payload_and_trims_results(azure_search_k
 
 
 def test_docling_document_search_accepts_string_input(azure_search_kwargs):
-    requester = FakeRequester({"value": []})
+    requester = FakeRequester({"value": [], "@odata.count": 0})
     tool = DoclingDocumentSearchTool(requester=requester, **azure_search_kwargs)
 
     result = tool.run("seal failures")
     payload = requester.calls[-1][2]
 
     assert payload["search"] == "seal failures"
-    assert json.loads(result)["results"] == []
+    content = result.content if hasattr(result, "content") else result
+    parsed = json.loads(content)
+    assert parsed["results"] == []
+    assert parsed["@odata.count"] == 0
 
 
-def test_docling_document_content_requires_confirmation(azure_search_kwargs):
-    tool = DoclingDocumentContentTool(requester=FakeRequester({}), **azure_search_kwargs)
+class FakeCosmosContainer:
+    """In-memory container stub used for content tool tests."""
 
-    preview = tool.run({"document_ids": ["doc-7", "doc-9"]})
-    preview_payload = json.loads(preview)
+    def __init__(self, documents: list[dict[str, object]]) -> None:
+        self._documents = list(documents)
+        self.queries: list[tuple[str, list[dict[str, object]], bool]] = []
 
-    assert preview_payload["status"] == "preview"
-    assert preview_payload["documents"] == [
-        {"document_id": "doc-7"},
-        {"document_id": "doc-9"},
-    ]
-
-
-def test_docling_document_content_fetches_after_confirmation(azure_search_kwargs):
-    requester = FakeRequester(
-        {
-            "value": [
-                {
-                    "document_id": "doc-7",
-                    "title": "Rotor balance trial",
-                    "content": "Detailed procedures",
-                    "abstract": "Rotor work",
-                    "tags": ["rotor"],
-                }
-            ]
+    def query_items(
+        self,
+        *,
+        query: str,
+        parameters: list[dict[str, object]],
+        enable_cross_partition_query: bool,
+    ):
+        self.queries.append((query, parameters, enable_cross_partition_query))
+        requested = {
+            str(param["value"])
+            for param in parameters
+            if isinstance(param.get("value"), str)
         }
+        for document in self._documents:
+            identifier = document.get("id")
+            if isinstance(identifier, str) and identifier in requested:
+                yield document
+
+
+def test_docling_document_content_fetches_from_cosmos():
+    container = FakeCosmosContainer(
+        [
+            {"id": "doc-7", "title": "Rotor balance trial", "content": "Detailed procedures"},
+            {"id": "doc-9", "content": "Other"},
+        ]
     )
-    tool = DoclingDocumentContentTool(
-        requester=requester,
-        metadata_fields=["abstract", "tags"],
-        **azure_search_kwargs,
-    )
+    tool = DoclingDocumentContentTool(container_client=container)
 
-    result = tool.run(
-        DoclingDocumentContentInput(
-            document_ids=["doc-7"],
-            confirm=True,
-        )
-    )
-    payload = requester.calls[-1][2]
+    result = tool.run({"document_ids": ["doc-7", "missing"]})
+    content = result.content if hasattr(result, "content") else result
+    payload = json.loads(content)
 
-    assert payload["select"] == "document_id,title,content,abstract,tags"
-    assert "document_id eq 'doc-7'" in payload["filter"]
+    assert payload["documents"][0]["document_id"] == "doc-7"
+    assert payload["documents"][0]["title"] == "Rotor balance trial"
+    assert payload["missing_document_ids"] == ["missing"]
 
-    parsed = json.loads(result)
-    assert parsed["status"] == "complete"
-    assert parsed["documents"][0]["content"] == "Detailed procedures"
-    assert parsed["documents"][0]["abstract"] == "Rotor work"
+    query, parameters, cross_partition = container.queries[-1]
+    assert "c.id IN" in query
+    assert cross_partition is True
+    assert {param["value"] for param in parameters} == {"doc-7", "missing"}
 
 
-def test_docling_document_content_rejects_empty_identifiers(azure_search_kwargs):
-    tool = DoclingDocumentContentTool(requester=FakeRequester({}), **azure_search_kwargs)
+def test_docling_document_content_rejects_empty_identifiers():
+    tool = DoclingDocumentContentTool(container_client=FakeCosmosContainer([]))
 
     with pytest.raises(ValueError):
-        tool.run(DoclingDocumentContentInput(document_ids=[], confirm=True))
+        tool.run(DoclingDocumentContentInput(document_ids=[]))
