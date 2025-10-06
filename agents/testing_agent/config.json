@@ -1,16 +1,19 @@
 {
   "displayName": "Testing Agent",
   "id": "testing_agent",
-  "description": "Agent dedicated to locating and summarizing physical bearing testing reports.",
+  "description": "Agent dedicated to locating and summarizing approved docling research documents for testing workflows.",
   "handover": [],
   "tools": [
     {
-      "name": "TestingReportsSearchTool",
+      "name": "DoclingDocumentSearchTool",
       "config": {
-        "index_env_var": "TESTING_AGENT_SEARCH_INDEX",
-        "content_key": "content",
-        "top_k": 5,
-        "vector_field": null
+        "index_env_var": "TESTING_AGENT_SEARCH_INDEX"
+      }
+    },
+    {
+      "name": "DoclingDocumentContentTool",
+      "config": {
+        "container_env_var": "CosmosTestDocumentsContainer"
       }
     }
   ],

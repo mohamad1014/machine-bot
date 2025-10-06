@@ -8,6 +8,7 @@ Machine Bot is an Azure Functions (Python) application that orchestrates LangCha
 - `functions/`: Individual function triggers (HTTP, queue, timer, Cosmos DB).  Tests mock these functions directly.
 - `agents/`: Agent implementations built on LangChain / LangGraph.
 - `middleware/`: Reusable middleware and routing helpers for orchestrating the agent graph.
+-   - Includes `documents_tools.py` with the shared Azure AI Search base class plus the docling document search and gated content tools used by the Testing Agent.
 - `infra/`: Bicep templates and deployment assets.
 - `tests/`: Pytest suite covering the Azure Functions and agent behaviors.  Test data fixtures are under `tests/data/`.
 
@@ -50,6 +51,7 @@ Machine Bot is an Azure Functions (Python) application that orchestrates LangCha
 - Follow standard Python typing practices; the project targets Python 3.12 with `from __future__ import annotations` where useful.
 - Keep Azure Function handlers stateless.  Use helpers in `agents/` and `middleware/` for shared state.
 - Prefer small, pure functions for agent tools and include docstrings describing tool contracts.
+- When working with the docling document index ensure tools only expose `document_id`, `title`, and `abstract` during query construction, and enforce the preview/confirm workflow before fetching full content.
 - Update or add pytest coverage when modifying behavior.  Tests should not depend on real Azure resources; use fixtures or monkeypatching.
 
 ## Pull request & CI expectations

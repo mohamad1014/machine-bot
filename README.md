@@ -11,6 +11,7 @@ Machine Bot is a Python project designed to answer and solve questions related t
 
 - **LangChain**: Advanced language model orchestration for contextual question answering.
 - **Azure Cloud Services**: Secure, scalable cloud infrastructure for data storage and processing.
+- **Docling Research Index Tools**: Purpose-built utilities built on a shared Azure AI Search base class for composing queries and retrieving approved research content.
 - **Telegram Integration**: Real-time communication with users via Telegram bot.
 - **Gradio (Hugging Face Spaces)**: Interactive web interface for demonstrations and user interaction.
 - **uv**: Fast Python package manager for efficient dependency management.
@@ -48,6 +49,11 @@ uv sync
 1. Set up your Azure credentials.
 2. Configure your Telegram bot token.
 3. (Optional) Deploy to Hugging Face Spaces for Gradio UI.
+4. Provide Azure AI Search settings for the document index:
+   - `AZURE_SEARCH_ENDPOINT`
+   - `AZURE_SEARCH_API_KEY`
+   - `TESTING_AGENT_SEARCH_INDEX` (or reuse `AZURE_SEARCH_INDEX_NAME`)
+   - (Optional) `AZURE_SEARCH_API_VERSION`
 
 ### Usage
 
@@ -58,6 +64,14 @@ uv sync
   with a function key, enter it in the optional **API key** field (or set `MACHINE_BOT_API_KEY` to
   pre-populate the value). The UI now keeps a per-session `conversation_id` and includes it in all
   requests so that other integrations can correlate transcripts in the same way.
+
+### Document research workflow
+
+- Use the `docling_documents_search` tool when the agent needs to query the `docling-rag-documents-v422` index. Provide natural language queries plus optional tag, industry, application, or document type filters—the tool builds the JSON payload that is sent to Azure AI Search and returns only the `document_id`, `title`, and `abstract` fields.
+- Call `docling_documents_content` in two steps:
+  1. **Preview** – Invoke the tool with `confirm: false` (default) to list the requested document identifiers. Share that list with the user to verify the correct files.
+  2. **Retrieve** – Re-run with `confirm: true` after user approval. The tool downloads the full `content` along with approved metadata fields for downstream analysis.
+- The Testing Agent only uses these two tools and always follows the preview/confirm protocol before downloading any full document.
 
 ## Example
 
