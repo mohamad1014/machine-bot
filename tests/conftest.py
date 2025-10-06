@@ -59,7 +59,12 @@ if "langgraph" not in sys.modules:  # pragma: no cover - defensive setup
                                     result = tool.invoke(args)
                                 else:  # pragma: no cover - fallback for plain callables
                                     result = tool(**args)
-                                messages.append(ToolMessage(result))
+                                if hasattr(result, "content") and hasattr(
+                                    result, "tool_call_id"
+                                ):
+                                    messages.append(result)
+                                else:
+                                    messages.append(ToolMessage(result))
                     final = self.llm.invoke(messages)
                     messages.append(final)
                 return {"messages": messages}

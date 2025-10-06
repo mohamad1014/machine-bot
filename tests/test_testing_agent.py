@@ -5,11 +5,11 @@ import json
 import pytest
 from typing import Any
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 
 import agents.vanilla_agent as vanilla_agent
 from agents.testing_agent import TestingAgent
-from middleware import testing_reports
+from middleware import documents_tools
 
 
 class FakeListChatModel:
@@ -25,32 +25,77 @@ class FakeListChatModel:
         return self._responses.pop(0)
 
 
-class StubTool:
-    """Tool stub that records invocations and returns canned payloads."""
+class StubSearchTool:
+    """Tool stub that records search invocations and returns canned payloads."""
 
-    name: str = "testing_reports_search"
+    name: str = "docling_documents_search"
     payload: str = ""
-    instances: list["StubTool"] = []
+    instances: list["StubSearchTool"] = []
 
     def __init__(self, **kwargs: Any) -> None:
         self.calls: list[dict[str, str]] = []
         self.config = kwargs
-        StubTool.instances.append(self)
+        StubSearchTool.instances.append(self)
 
-    def run(self, *args: Any, **kwargs: Any) -> str:  # type: ignore[unused-argument]
+    def run(self, *args: Any, **kwargs: Any) -> ToolMessage:  # type: ignore[unused-argument]
         if args and isinstance(args[0], dict):
             self.calls.append(args[0])
         elif "query" in kwargs:
             self.calls.append({"query": kwargs["query"]})
         else:
             self.calls.append({"args": list(args), "kwargs": dict(kwargs)})
-        return self.payload
+        return ToolMessage(
+            content=self.payload,
+            name=self.name,
+            tool_call_id=kwargs.get("tool_call_id") or "stub-search-call",
+        )
 
-    def invoke(self, args: dict[str, Any]) -> str:
-        return self.run(args)
+    def invoke(self, args: dict[str, Any]) -> ToolMessage:
+        call_args: dict[str, Any]
+        if "args" in args and isinstance(args["args"], dict):
+            call_args = args["args"]
+        elif isinstance(args, dict):
+            call_args = args
+        else:
+            call_args = {}
+        if isinstance(call_args, dict):
+            self.calls.append(call_args)
+        return ToolMessage(
+            content=self.payload,
+            name=self.name,
+            tool_call_id=args.get("id") or "stub-search-call",
+        )
 
     def __call__(self, *args: Any, **kwargs: Any) -> str:
         return self.run(*args, **kwargs)
+
+
+class StubContentTool:
+    """Tool stub that enforces preview/confirm but is not invoked in these tests."""
+
+    name: str = "docling_documents_content"
+    instances: list["StubContentTool"] = []
+
+    def __init__(self, **kwargs: Any) -> None:
+        self.config = kwargs
+        self.calls: list[dict[str, Any]] = []
+        StubContentTool.instances.append(self)
+
+    def run(self, *args: Any, **kwargs: Any) -> ToolMessage:  # type: ignore[unused-argument]
+        self.calls.append({"args": args, "kwargs": kwargs})
+        return ToolMessage(
+            content="{}",
+            name=self.name,
+            tool_call_id=kwargs.get("tool_call_id") or "stub-content-call",
+        )
+
+    def invoke(self, args: dict[str, Any]) -> ToolMessage:
+        self.calls.append({"args": (), "kwargs": args})
+        return ToolMessage(
+            content="{}",
+            name=self.name,
+            tool_call_id=args.get("id") or "stub-content-call",
+        )
 
 def _build_tool_calling_model(payload: str) -> FakeListChatModel:
     tool_call_message = AIMessage(
@@ -60,7 +105,7 @@ def _build_tool_calling_model(payload: str) -> FakeListChatModel:
                 {
                     "id": "call_1",
                     "function": {
-                        "name": "testing_reports_search",
+                        "name": "docling_documents_search",
                         "arguments": json.dumps({"query": "test query"}),
                     },
                 }
@@ -73,10 +118,12 @@ def _build_tool_calling_model(payload: str) -> FakeListChatModel:
 
 def test_testing_agent_invokes_search_tool(monkeypatch):
     payload = "Result payload"
-    StubTool.payload = payload
-    StubTool.instances = []
-    monkeypatch.setattr(testing_reports, "TestingReportsSearchTool", StubTool)
-    monkeypatch.setenv("TESTING_AGENT_SEARCH_INDEX", "bearing-testing-index")
+    StubSearchTool.payload = payload
+    StubSearchTool.instances = []
+    StubContentTool.instances = []
+    monkeypatch.setattr(documents_tools, "DoclingDocumentSearchTool", StubSearchTool)
+    monkeypatch.setattr(documents_tools, "DoclingDocumentContentTool", StubContentTool)
+    monkeypatch.setenv("TESTING_AGENT_SEARCH_INDEX", "docling-rag-documents-v422")
     fake_model = _build_tool_calling_model(payload)
     monkeypatch.setattr(vanilla_agent, "AzureChatOpenAI", lambda **_: fake_model)
     vanilla_agent.VanillaAgent.MEMORY = []
@@ -85,8 +132,8 @@ def test_testing_agent_invokes_search_tool(monkeypatch):
 
     result = agent.invoke({"input": "Find calibration steps"})
 
-    assert StubTool.instances, "Tool should be instantiated from configuration."
-    tool_instance = StubTool.instances[-1]
+    assert StubSearchTool.instances, "Tool should be instantiated from configuration."
+    tool_instance = StubSearchTool.instances[-1]
     tool_messages = [
         message
         for message in result["messages"]
@@ -97,14 +144,18 @@ def test_testing_agent_invokes_search_tool(monkeypatch):
     assert result["messages"][-1].content == "Search complete"
     assert tool_instance.calls and tool_instance.calls[0]["query"] == "test query"
     assert tool_instance.config["index_env_var"] == "TESTING_AGENT_SEARCH_INDEX"
-    assert tool_instance.config["content_key"] == "content"
+    assert StubContentTool.instances
+    content_instance = StubContentTool.instances[-1]
+    assert content_instance.config["container_env_var"] == "CosmosTestDocumentsContainer"
 
 
 def test_testing_agent_reports_no_results(monkeypatch):
-    StubTool.payload = "No relevant testing reports were found in Azure AI Search."
-    StubTool.instances = []
-    monkeypatch.setattr(testing_reports, "TestingReportsSearchTool", StubTool)
-    monkeypatch.setenv("TESTING_AGENT_SEARCH_INDEX", "bearing-testing-index")
+    StubSearchTool.payload = "No relevant testing reports were found in Azure AI Search."
+    StubSearchTool.instances = []
+    StubContentTool.instances = []
+    monkeypatch.setattr(documents_tools, "DoclingDocumentSearchTool", StubSearchTool)
+    monkeypatch.setattr(documents_tools, "DoclingDocumentContentTool", StubContentTool)
+    monkeypatch.setenv("TESTING_AGENT_SEARCH_INDEX", "docling-rag-documents-v422")
     fake_model = _build_tool_calling_model("unused")
     monkeypatch.setattr(vanilla_agent, "AzureChatOpenAI", lambda **_: fake_model)
     vanilla_agent.VanillaAgent.MEMORY = []
@@ -119,3 +170,5 @@ def test_testing_agent_reports_no_results(monkeypatch):
     ]
     assert tool_messages
     assert "No relevant testing reports" in tool_messages[-1].content
+    content_instance = StubContentTool.instances[-1]
+    assert content_instance.config["container_env_var"] == "CosmosTestDocumentsContainer"

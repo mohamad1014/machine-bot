@@ -1,10 +1,17 @@
 """Middleware utilities for Machine Bot agents."""
 
-from . import testing_reports as testing_reports
-from .testing_reports import TestingReportsSearchTool, testing_reports_search
+from .documents_tools import (
+    AzureSearchToolBase,
+    DoclingDocumentContentInput,
+    DoclingDocumentContentTool,
+    DoclingDocumentSearchInput,
+    DoclingDocumentSearchTool,
+)
 
 __all__ = [
-    "TestingReportsSearchTool",
-    "testing_reports_search",
-    "testing_reports",
+    "AzureSearchToolBase",
+    "DoclingDocumentSearchTool",
+    "DoclingDocumentContentTool",
+    "DoclingDocumentSearchInput",
+    "DoclingDocumentContentInput",
 ]
