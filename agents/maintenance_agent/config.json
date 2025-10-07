@@ -4,5 +4,10 @@
   "description": "Handles maintenance queries and tasks.",
   "handover": [],
   "tools": [],
-  "model": "gpt-4.1"
+  "model": "gpt-4.1",
+  "logging": {
+    "enabled": true,
+    "level": "INFO",
+    "save_to_blob": false
+  }
 }

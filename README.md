@@ -55,6 +55,24 @@ uv sync
    - `TESTING_AGENT_SEARCH_INDEX` (or reuse `AZURE_SEARCH_INDEX_NAME`)
    - (Optional) `AZURE_SEARCH_API_VERSION`
 
+### Agent logging
+
+Each agent configuration file now includes a `logging` section. Logging is
+enabled by default at the `INFO` level and captures human inputs, model
+responses, and tool usage for the agent that is executing the request. Set
+`save_to_blob` to `true` in an agent's configuration when you want its log
+entries persisted to Azure Blob Storage. When blob persistence is enabled the
+agent expects the following environment variables:
+
+- `AGENT_LOGS_CONTAINER` – name of the blob container that will store log
+  files.
+- `AzureWebJobsStorage` – connection string used to authenticate with the
+  storage account (override with `blob_connection_env_var` if needed).
+
+Use `blob_container_env_var`, `blob_connection_env_var`, and
+`blob_path_prefix` inside the `logging` section to customize where the log
+files are written.
+
 ### Usage
 
 - **Telegram**: Interact with the bot by sending questions about your machines.
