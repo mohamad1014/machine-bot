@@ -8,6 +8,7 @@ from typing import Any
 from langchain_core.messages import AIMessage, ToolMessage
 
 import agents.vanilla_agent as vanilla_agent
+import agents.logging_utils as logging_utils
 from agents.testing_agent import TestingAgent
 from middleware import documents_tools
 
@@ -172,3 +173,73 @@ def test_testing_agent_reports_no_results(monkeypatch):
     assert "No relevant testing reports" in tool_messages[-1].content
     content_instance = StubContentTool.instances[-1]
     assert content_instance.config["container_env_var"] == "CosmosTestDocumentsContainer"
+
+
+def test_agent_logging_captures_interactions(monkeypatch):
+    payload = "Result payload"
+    StubSearchTool.payload = payload
+    StubSearchTool.instances = []
+    StubContentTool.instances = []
+    monkeypatch.setattr(documents_tools, "DoclingDocumentSearchTool", StubSearchTool)
+    monkeypatch.setattr(documents_tools, "DoclingDocumentContentTool", StubContentTool)
+    monkeypatch.setenv("TESTING_AGENT_SEARCH_INDEX", "docling-rag-documents-v422")
+    fake_model = _build_tool_calling_model(payload)
+    monkeypatch.setattr(vanilla_agent, "AzureChatOpenAI", lambda **_: fake_model)
+    vanilla_agent.VanillaAgent.MEMORY = []
+
+    agent = TestingAgent()
+
+    agent.invoke({"input": "Log the next testing steps"})
+
+    logs = agent.get_logs()
+    assert any("received human input" in line for line in logs)
+    assert any("final AI response" in line for line in logs)
+    assert any("invoking tool docling_documents_search" in line for line in logs)
+
+
+def test_agent_logging_uploads_to_blob(monkeypatch):
+    class StubContainerClient:
+        def __init__(self) -> None:
+            self.uploads: list[tuple[str, bytes, bool]] = []
+            self.container_name: str | None = None
+
+        def upload_blob(self, name: str, data: bytes, overwrite: bool) -> None:
+            self.uploads.append((name, data, overwrite))
+
+    stub_container = StubContainerClient()
+
+    class StubBlobServiceClient:
+        last_connection_string: str | None = None
+
+        @classmethod
+        def from_connection_string(cls, connection_string: str) -> "StubBlobServiceClient":
+            cls.last_connection_string = connection_string
+            return cls()
+
+        def get_container_client(self, container_name: str) -> StubContainerClient:
+            stub_container.container_name = container_name
+            return stub_container
+
+    monkeypatch.setenv("AGENT_LOGS_CONTAINER", "agent-logs")
+    monkeypatch.setenv("AzureWebJobsStorage", "UseDevelopmentStorage=true")
+    monkeypatch.setenv("TESTING_AGENT_SEARCH_INDEX", "docling-rag-documents-v422")
+    monkeypatch.setattr(logging_utils, "BlobServiceClient", StubBlobServiceClient)
+    monkeypatch.setattr(documents_tools, "DoclingDocumentSearchTool", StubSearchTool)
+    monkeypatch.setattr(documents_tools, "DoclingDocumentContentTool", StubContentTool)
+
+    fake_model = FakeListChatModel([AIMessage(content="All good")])
+    monkeypatch.setattr(vanilla_agent, "AzureChatOpenAI", lambda **_: fake_model)
+    vanilla_agent.VanillaAgent.MEMORY = []
+
+    agent = TestingAgent()
+    agent.logging_settings.save_to_blob = True
+
+    agent.invoke({"input": "Upload this log"})
+
+    assert stub_container.uploads, "Expected the agent log to be uploaded"
+    blob_name, payload, overwrite = stub_container.uploads[0]
+    assert stub_container.container_name == "agent-logs"
+    assert StubBlobServiceClient.last_connection_string == "UseDevelopmentStorage=true"
+    assert blob_name.endswith(".log")
+    assert overwrite is True
+    assert "Upload this log" in payload.decode("utf-8")

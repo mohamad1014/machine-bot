@@ -7,6 +7,7 @@ Machine Bot is an Azure Functions (Python) application that orchestrates LangCha
 - `function_app.py`: Azure Functions entry point that wires triggers to the shared FastAPI-style app object.
 - `functions/`: Individual function triggers (HTTP, queue, timer, Cosmos DB).  Tests mock these functions directly.
 - `agents/`: Agent implementations built on LangChain / LangGraph.
+-   - `logging_utils.py` centralizes per-agent logging configuration, the in-memory handler used for capturing run transcripts, utility helpers that wrap tool invocations, and the optional Azure Blob uploader that persists logs when enabled.
 - `middleware/`: Reusable middleware and routing helpers for orchestrating the agent graph.
 -   - Includes `documents_tools.py` with the shared Azure AI Search base class plus the docling document search and gated content tools used by the Testing Agent.
 - `infra/`: Bicep templates and deployment assets.
@@ -46,6 +47,17 @@ Machine Bot is an Azure Functions (Python) application that orchestrates LangCha
   ```bash
   func start
   ```
+
+## Agent logging overview
+- Each agent configuration (`agents/*/config.json`) now supports a `logging` block with:
+  - `enabled` (default `true`) to toggle logging per agent.
+  - `level` (default `INFO`) to control verbosity.
+  - `save_to_blob` (default `false`) plus optional overrides for `blob_container_env_var`, `blob_connection_env_var`, and `blob_path_prefix` when persisted logs should be written to Azure Blob Storage.
+- `VanillaAgent` reads these settings on initialization, sets up an `AgentMemoryLogHandler` to capture human inputs, model responses, tool requests, and final replies, and injects the configured logger into every tool via `instrument_tool_logging` so downstream components emit consistent telemetry.
+- When `save_to_blob` is enabled, `BlobLogUploader` streams the buffered log contents to the container specified by `AGENT_LOGS_CONTAINER` (or the override provided in configuration) using the connection string from `AzureWebJobsStorage`.
+
+## Testing notes
+- Unit tests covering the Testing Agent validate the new logging behavior (captured interactions, tool instrumentation, and Azure Blob uploads). When running the suite locally without internet access, `uv run pytest` may fail to download optional dependencies such as `tiktoken`; rerun after populating a local package cache or install dependencies manually if required.
 
 ## Coding guidelines
 - Follow standard Python typing practices; the project targets Python 3.12 with `from __future__ import annotations` where useful.
